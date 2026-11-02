@@ -2,6 +2,7 @@
 // Each reports its outcome with a toast; failures carry the service's user-facing message.
 import { navigate } from "@/app/router";
 import { dismissToast, toast } from "@/app/toast";
+import { datasetsRepo } from "@/storage";
 import { datasets, networks } from "@/training";
 import type { EngineRecord } from "@/types";
 import { downloadBlob, pickFile, slugify } from "@/utils/misc";
@@ -33,7 +34,12 @@ export async function importDatasetFromFile(): Promise<string | null> {
   const t = toast(`Importing “${name}”…`, { timeoutMs: 0 });
   try {
     const id = await datasets.importFile(file, { name });
-    toast(`Imported dataset “${name}”`, { kind: "success" });
+    const record = await datasetsRepo.get(id).catch(() => undefined);
+    // When lines were skipped the service already shows a warning toast (and notes it in the
+    // description, "Skipped N invalid …"): one toast per import is enough.
+    if (!record?.description.includes("Skipped")) {
+      toast(`Imported dataset “${name}”`, { kind: "success", detail: record ? `${record.positions.toLocaleString("en-US")} positions.` : undefined });
+    }
     return id;
   } catch (e) {
     toast("Could not import the dataset", { kind: "error", detail: errorMessage(e) });

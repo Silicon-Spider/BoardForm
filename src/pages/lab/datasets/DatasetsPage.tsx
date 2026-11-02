@@ -86,9 +86,15 @@ export function DatasetsPage() {
         <div className="panel">
           <div className={"lab-table-tools" + (chosen.length ? " active" : "")} aria-live="polite">
             {chosen.length === 0 ? (
-              <span className="small muted">
-                {countOf(sorted.length, "dataset")} · {formatCount(sorted.reduce((a, d) => a + d.positions, 0))} positions · tick datasets to merge them or train on them
-              </span>
+              <>
+                <span className="small muted grow">
+                  {countOf(sorted.length, "dataset")} · {formatCount(sorted.reduce((a, d) => a + d.positions, 0))} positions · tick datasets to merge them or train on them
+                </span>
+                {/* The header's "select all" checkbox is hidden when the table stacks (narrow windows). */}
+                <button type="button" className="lab-link-btn small lab-narrow-only" onClick={() => setSelected(new Set(sorted.map((d) => d.id)))}>
+                  Select all
+                </button>
+              </>
             ) : (
               <>
                 <span className="small lab-strong">
@@ -101,6 +107,11 @@ export function DatasetsPage() {
                 <Link to={`/lab/new?datasetIds=${chosen.map((d) => encodeURIComponent(d.id)).join(",")}`} className="btn btn-sm">
                   <LabIcon name="spark" /> Train a network on {chosen.length === 1 ? "it" : "them"}
                 </Link>
+                {!allChecked && (
+                  <button type="button" className="btn btn-sm btn-ghost lab-narrow-only" onClick={() => setSelected(new Set(sorted.map((d) => d.id)))}>
+                    Select all
+                  </button>
+                )}
                 <button type="button" className="btn btn-sm btn-ghost" onClick={() => setSelected(new Set())}>
                   Clear
                 </button>
@@ -108,7 +119,7 @@ export function DatasetsPage() {
             )}
           </div>
           <div className="lab-table-wrap">
-            <table className="table lab-datasets-table">
+            <table className="table lab-datasets-table lab-stack-table">
               <thead>
                 <tr>
                   <th className="lab-col-check">
@@ -195,8 +206,12 @@ function DatasetRow({
           </span>
         )}
       </td>
-      <td className="num">{formatCount(positions)}</td>
-      <td className="num">{games > 0 || d.source.kind === "selfplay" ? formatCount(games) : <span className="faint">—</span>}</td>
+      <td className="num" data-label="Positions">
+        {formatCount(positions)}
+      </td>
+      <td className={"num" + (games > 0 || d.source.kind === "selfplay" ? "" : " lab-stack-empty")} data-label="Games">
+        {games > 0 || d.source.kind === "selfplay" ? formatCount(games) : <span className="faint">—</span>}
+      </td>
       <td className="num lab-col-optional">{d.chunks}</td>
       <td className="num lab-col-optional">{formatBytes(datasetBytes({ positions }))}</td>
       <td className="lab-col-optional small muted lab-cell-source" title={describeDatasetSource(d, { engine: engineName, network: networkName })}>
@@ -210,7 +225,13 @@ function DatasetRow({
           label={`Actions for ${d.name}`}
           items={[
             { label: "Open", icon: <LabIcon name="database" />, onSelect: () => navigate(`/lab/datasets/${d.id}`) },
-            { label: "Train a network on it", icon: <LabIcon name="spark" />, onSelect: () => navigate(`/lab/new?datasetIds=${encodeURIComponent(d.id)}`) },
+            {
+              label: "Train a network on it",
+              icon: <LabIcon name="spark" />,
+              disabled: positions === 0,
+              title: positions === 0 ? "This dataset has no positions yet" : undefined,
+              onSelect: () => navigate(`/lab/new?datasetIds=${encodeURIComponent(d.id)}`),
+            },
             { label: "Export .cbds", icon: <LabIcon name="download" />, disabled: d.positions === 0, onSelect: () => void exportDataset(d.id, d.name) },
             "separator",
             { label: "Delete…", icon: <Icon name="trash" />, danger: true, disabled: generating, title: generating ? "Stop generating first" : undefined, onSelect: onDelete },

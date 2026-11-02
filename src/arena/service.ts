@@ -181,7 +181,7 @@ function notifyFinished(record: MatchRecord, labels: string[]): void {
     const rows = computeStandings(cfg, record.results);
     const a = rows.find((r) => r.participant === 0)!;
     const b = rows.find((r) => r.participant === 1)!;
-    toast(`${cfg.name} finished: ${formatPoints(a.points)} - ${formatPoints(b.points)}`, {
+    toast(`${cfg.name} finished: ${formatPoints(a.points)} – ${formatPoints(b.points)}`, {
       kind: "success",
       detail: `${labels[0]} ${formatPoints(a.points)} – ${formatPoints(b.points)} ${labels[1]}`,
       timeoutMs: 8000,

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/app/toast";
 import { Icon, ProgressBar, useConfirm } from "@/components";
-import { errorMessage, restoreStarterEngines } from "@/pages/engines/actions";
+import { errorMessage, restoreStarterEngines, restoredStartersMessage } from "@/pages/engines/actions";
 import { PageIcon } from "@/pages/engines/icons";
 import { cx } from "@/pages/engines/ui";
 import {
@@ -317,8 +317,8 @@ function RestoreStartersRow() {
   const run = async () => {
     setBusy(true);
     try {
-      await restoreStarterEngines();
-      toast("Starter engines restored", { kind: "success", detail: "Blocky, Classic and Sprout are in your library." });
+      const { message, detail } = restoredStartersMessage(await restoreStarterEngines());
+      toast(message, { kind: "success", detail });
     } catch (err) {
       toast("Could not restore the starter engines", { kind: "error", detail: errorMessage(err) });
     } finally {
@@ -326,7 +326,7 @@ function RestoreStartersRow() {
     }
   };
   return (
-    <SettingRow title="Restore starter engines" description="Adds fresh copies of Blocky, Classic and Sprout to your library. Your own engines — and any starter engines you still have — are not changed.">
+    <SettingRow title="Restore starter engines" description="Brings back Blocky, Classic and Sprout if you deleted or changed them, as fresh copies. Your own engines — and the starter engines you changed — are kept as they are.">
       <button type="button" className="btn btn-sm" onClick={run} disabled={busy}>
         {busy ? <span className="spinner" style={{ width: 13, height: 13 }} aria-hidden="true" /> : <PageIcon name="refresh" size={14} />}
         {busy ? "Restoring…" : "Restore starter engines"}

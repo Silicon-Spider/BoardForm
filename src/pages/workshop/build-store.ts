@@ -4,7 +4,8 @@
 // the engine record by buildEngine().
 import { create } from "zustand";
 import { assembleSources, buildEngine, sourceHashOf } from "@/engine-host";
-import type { CompileDiagnostic, CompileResult, EngineRecord } from "@/types";
+import { REQUIRED_FUNCTIONS } from "@/engine-host/abi";
+import type { CompileResult, EngineRecord } from "@/types";
 
 export interface BuildRun {
   /** Increasing number per page session (lets effects notice a new run). */
@@ -21,6 +22,11 @@ export interface BuildRun {
   sizeBytes: number | null;
   /** A problem outside the compiler (no entry file, no generated code, ...). */
   problem: string | null;
+  /**
+   * Required ABI exports a successful build lacks (e.g. the entry file is not the one that
+   * exports cb_go): the module compiled but cannot run as an engine. Empty or absent when fine.
+   */
+  missingExports?: string[];
 }
 
 export interface EngineBuildState {
@@ -56,9 +62,21 @@ export function getEngineBuild(engineId: string): EngineBuildState {
 let seq = 0;
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/** Errors of a compile result. */
-export function errorsOf(result: CompileResult | null | undefined): CompileDiagnostic[] {
-  return result ? result.diagnostics.filter((d) => d.severity === "error") : [];
+/**
+ * The required ABI exports (docs/ENGINE_ABI.md) a compiled module lacks. Only compiles the module
+ * (never instantiates it, so user code never runs on the main thread); [] when it cannot tell.
+ */
+export async function missingRequiredExports(wasm: ArrayBuffer): Promise<string[]> {
+  try {
+    const module = await WebAssembly.compile(wasm);
+    const exports = WebAssembly.Module.exports(module);
+    const has = (name: string, kind: WebAssembly.ImportExportKind) => exports.some((e) => e.name === name && e.kind === kind);
+    const missing: string[] = REQUIRED_FUNCTIONS.filter((name) => !has(name, "function"));
+    if (!has("memory", "memory") && !WebAssembly.Module.imports(module).some((i) => i.kind === "memory")) missing.push("memory");
+    return missing;
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -88,7 +106,9 @@ export async function runBuild(
     }
     const out = await buildEngine(engine, { force: opts.force, onStatus: status });
     saved = out.engine;
+    const missingExports = out.ok && out.engine.build?.wasm ? await missingRequiredExports(out.engine.build.wasm) : [];
     run = {
+      missingExports,
       seq: ++seq,
       at: Date.now(),
       ok: out.ok,

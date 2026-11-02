@@ -16,7 +16,12 @@ export interface ValidationSources {
   engine(id: string): Promise<EngineRecord | undefined>;
 }
 
+/** Batch sizes / epoch counts beyond these are not suggested in the estimate's advice. */
+const SENSIBLE_MIN_BATCH = 128;
+const SENSIBLE_MAX_EPOCHS = 100;
+
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
+const isId = (v: unknown): v is string => typeof v === "string" && v !== "";
 const fmt = (n: number) => n.toLocaleString("en-US");
 
 /** Hidden size the run's network will have (null when the source network is unknown). */
@@ -24,7 +29,7 @@ async function targetHidden(config: TrainingRunConfig, src: ValidationSources): 
   const n = config.network;
   if (n.mode === "new") return n.hidden;
   if (n.mode === "widen") return n.newHidden;
-  const rec = await src.network(n.networkId);
+  const rec = isId(n.networkId) ? await src.network(n.networkId) : undefined;
   return rec ? rec.hidden : null;
 }
 
@@ -43,7 +48,7 @@ export async function validateRunConfig(config: TrainingRunConfig, src: Validati
     if (!isValidHidden(n.hidden)) problems.push(`The hidden size must be a multiple of 8 between ${MIN_HIDDEN} and ${fmt(MAX_HIDDEN)} (got ${String(n.hidden)}).`);
     if (n.activation !== 0 && n.activation !== 1) problems.push("Choose an activation function (CReLU or SCReLU).");
   } else if (n.mode === "continue" || n.mode === "widen") {
-    const rec = n.networkId ? await src.network(n.networkId) : undefined;
+    const rec = isId(n.networkId) ? await src.network(n.networkId) : undefined;
     if (!rec) problems.push(`The network to ${n.mode === "continue" ? "continue training" : "widen"} no longer exists. Choose another one.`);
     else if (!(await src.networkHasData(rec.id))) problems.push(`The weights of the network "${rec.name}" are missing. Import it again or choose another network.`);
     else sourceExists = true;
@@ -61,7 +66,8 @@ export async function validateRunConfig(config: TrainingRunConfig, src: Validati
   let positions = 0;
   let missing = 0;
   for (const id of ids) {
-    const ds = await src.dataset(id);
+    // A malformed id (e.g. undefined from a stale form) counts as missing instead of reaching IndexedDB.
+    const ds = isId(id) ? await src.dataset(id) : undefined;
     if (!ds) missing++;
     else positions += ds.positions;
   }
@@ -78,7 +84,7 @@ export async function validateRunConfig(config: TrainingRunConfig, src: Validati
           "Self-play with the run's own network needs an existing network for the first cycle. Choose an engine for self-play, or continue / widen an existing network.",
         );
       }
-    } else if (!(await src.engine(sp.engineId))) {
+    } else if (!isId(sp.engineId) || !(await src.engine(sp.engineId))) {
       problems.push("The self-play engine no longer exists. Choose another engine.");
     }
     if (!isInt(sp.games) || sp.games < 1) problems.push("Self-play needs at least 1 game per cycle.");
@@ -134,7 +140,7 @@ export async function validateRunConfig(config: TrainingRunConfig, src: Validati
 async function plannedPositions(config: TrainingRunConfig, src: ValidationSources): Promise<number> {
   let positions = 0;
   for (const id of config.data?.datasetIds ?? []) {
-    const ds = await src.dataset(id);
+    const ds = isId(id) ? await src.dataset(id) : undefined;
     if (ds) positions += ds.positions;
   }
   const sp = config.data?.selfPlay;
@@ -160,12 +166,18 @@ export async function estimateRun(config: TrainingRunConfig, src: ValidationSour
     warnings.push("There are no positions to train on yet: add datasets or enable self-play.");
   } else {
     if (totalSteps < MIN_USEFUL_STEPS) {
-      const suggestion = epochs > 0 ? Math.max(1, Math.floor((trainPositions * epochs) / MIN_USEFUL_STEPS)) : 0;
+      // Only quote numbers that are sensible to type in: tiny batches train badly (noisy
+      // gradients, slow), and hundreds of epochs over a few positions just memorise them.
+      const batchForSteps = epochs > 0 ? Math.floor((trainPositions * epochs) / MIN_USEFUL_STEPS) : 0;
       const neededEpochs = stepsPerEpoch > 0 ? Math.ceil(MIN_USEFUL_STEPS / stepsPerEpoch) : 0;
+      const advice: string[] = [];
+      if (batchForSteps >= SENSIBLE_MIN_BATCH && batchForSteps < batch) advice.push(`a smaller batch size (about ${fmt(batchForSteps)})`);
+      if (neededEpochs > epochs && neededEpochs <= SENSIBLE_MAX_EPOCHS) advice.push(`about ${fmt(neededEpochs)} epochs`);
       warnings.push(
         `Only ${fmt(totalSteps)} optimizer steps per cycle — below about ${fmt(MIN_USEFUL_STEPS)} a network barely learns. ` +
-          `Use a smaller batch size${suggestion > 0 && suggestion < batch ? ` (about ${fmt(suggestion)})` : ""}` +
-          `${neededEpochs > epochs ? ` or about ${fmt(neededEpochs)} epochs` : " or more epochs"}.`,
+          (advice.length > 0
+            ? `Use ${advice.join(" or ")}.`
+            : "Add more positions (more self-play games or datasets), or use a smaller batch size and more epochs."),
       );
     }
     if (positions < MIN_USEFUL_POSITIONS) {

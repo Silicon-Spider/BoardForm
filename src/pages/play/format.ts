@@ -69,7 +69,8 @@ export function capsText(limits: EngineLimits): string {
   const parts: string[] = [];
   if (limits.movetimeMs) parts.push(`${Number((limits.movetimeMs / 1000).toFixed(3))} s per move`);
   if (limits.depth) parts.push(`depth ${limits.depth}`);
-  if (limits.nodes) parts.push(`${formatCount(limits.nodes)} nodes`);
+  // "3k nodes" rather than formatCount's "3.00k" (trailing zeros of the fraction dropped).
+  if (limits.nodes) parts.push(`${formatCount(limits.nodes).replace(/\.(\d*?)0+(?=[kMG]$)/, (_, d: string) => (d ? `.${d}` : ""))} nodes`);
   return parts.join(" · ");
 }
 

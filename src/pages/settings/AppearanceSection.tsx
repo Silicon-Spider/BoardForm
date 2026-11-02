@@ -1,5 +1,5 @@
 // Settings → Appearance: colour theme and board appearance, with a live board preview.
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   BOARD_THEMES,
   getThemePreference,
@@ -25,9 +25,23 @@ const THEME_OPTIONS = [
 
 const systemPrefersDark = () => typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
 
+/** Whether the device currently prefers a dark theme (updates when the OS setting changes). */
+function useSystemPrefersDark(): boolean {
+  const [dark, setDark] = useState(systemPrefersDark);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const query = matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setDark(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return dark;
+}
+
 export function AppearanceSection() {
   const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
   const [prefs, setPrefs] = useBoardPreferences();
+  const systemDark = useSystemPrefersDark();
   const update = (patch: Partial<BoardPreferences>) => setPrefs({ ...prefs, ...patch });
 
   const chooseTheme = (value: ThemePreference) => {
@@ -40,7 +54,7 @@ export function AppearanceSection() {
       <SettingRow
         title="Colour theme"
         titleId="settings-theme-label"
-        description={theme === "system" ? `Follows your device — currently ${systemPrefersDark() ? "dark" : "light"}.` : "Dark is easier on the eyes for long sessions; light suits bright rooms."}
+        description={theme === "system" ? `Follows your device — currently ${systemDark ? "dark" : "light"}.` : "Dark is easier on the eyes for long sessions; light suits bright rooms."}
       >
         <Segmented options={THEME_OPTIONS} value={theme} onChange={chooseTheme} labelledBy="settings-theme-label" />
       </SettingRow>

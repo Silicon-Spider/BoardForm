@@ -16,7 +16,7 @@ The first time you open Chess Builder, three engines are waiting on the [Engines
 
 > **Note** Sprout is deliberately simple — it has no transposition table and no pruning tricks — so it plays much weaker than Blocky and Classic. That makes it a good sparring partner and a good place to learn.
 
-The starter engines are ordinary engines: change them, duplicate them or delete them. If you delete them, **Restore starter engines** in [Settings](#/settings) adds fresh copies. Before you experiment, **Duplicate** the engine you start from: the unchanged original is the opponent that tells you whether your change helped.
+The starter engines are ordinary engines: change them, duplicate them or delete them. If you delete them, **Restore starter engines** in [Settings](#/settings?section=storage) adds fresh copies. Before you experiment, **Duplicate** the engine you start from: the unchanged original is the opponent that tells you whether your change helped.
 
 ## Ways to build an engine
 
@@ -64,7 +64,7 @@ The bar at the top of the window takes you to every part of the app:
 
 Chess Builder saves as you go: engines, blocks, code, networks, datasets, games, matches and training runs are stored in your browser's database (IndexedDB) the moment they change. Close the tab, reopen it tomorrow, and everything is still there — including training runs, which can resume where they stopped.
 
-Your data stays in *this* browser on *this* computer. It is not synced between browsers or devices, and clearing your browser's site data deletes it. Export a backup from [Settings](#/settings) now and then; [Saving and backups](#/help/storage) explains the details.
+Your data stays in *this* browser on *this* computer. It is not synced between browsers or devices, and clearing your browser's site data deletes it. Export a backup from [Settings](#/settings?section=storage) now and then; [Saving and backups](#/help/storage) explains the details.
 
 ## What to read next
 

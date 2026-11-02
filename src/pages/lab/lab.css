@@ -990,6 +990,24 @@ a.lab-strong:hover {
   color: var(--text-dim);
   min-width: 0;
 }
+.lab-board-player {
+  display: block;
+}
+.lab-board-side {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  vertical-align: 0;
+}
+.lab-board-side.white {
+  background: #f1f1f1;
+}
+.lab-board-side.black {
+  background: #17202b;
+}
 .lab-boards-empty {
   color: var(--text-faint);
   font-size: 13px;
@@ -1973,6 +1991,14 @@ a.lab-strong:hover {
   }
   .lab-run-play {
     justify-content: flex-start;
+    flex: 1 1 100%;
+  }
+  .lab-details > summary .lab-panel-title {
+    white-space: nowrap;
+  }
+  .lab-details-hint {
+    margin-left: auto;
+    flex: 0 1 auto;
   }
   .lab-run-play .btn {
     width: 100%;
@@ -2062,4 +2088,98 @@ a.lab-strong:hover {
 }
 .lab-wizard-problems {
   margin-top: 20px;
+}
+
+/* ---------- narrow screens: list tables become stacked rows ----------
+   Row 1: [checkbox] name … actions; row 2: the labelled values (td[data-label]). Optional columns
+   are already hidden below 760px; cells marked .lab-stack-empty have nothing worth showing. */
+/* Controls that replace something the stacked tables hide (e.g. the "select all" checkbox). */
+.lab-narrow-only {
+  display: none;
+}
+@media (max-width: 600px) {
+  .lab-narrow-only {
+    display: inline-flex;
+  }
+  .lab-stack-table thead {
+    display: none;
+  }
+  .lab-stack-table,
+  .lab-stack-table tbody {
+    display: block;
+    width: 100%;
+  }
+  .lab-stack-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 14px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .lab-stack-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  /* Forces the labelled values onto their own line. */
+  .lab-stack-table tbody tr::after {
+    content: "";
+    order: 3;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .lab-stack-table td {
+    display: block;
+    order: 4;
+    padding: 0 !important;
+    border: none !important;
+    text-align: left !important;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .lab-stack-table td[data-label]::before {
+    content: attr(data-label);
+    margin-right: 6px;
+    color: var(--text-faint);
+    font-size: 11.5px;
+  }
+  .lab-stack-table td.lab-col-check,
+  .lab-stack-table td.lab-cell-name,
+  .lab-stack-table td.lab-cell-actions {
+    margin-top: 0;
+  }
+  .lab-stack-table td.lab-col-check {
+    order: 0;
+    width: auto;
+  }
+  .lab-stack-table td.lab-cell-name {
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    font-size: inherit;
+  }
+  .lab-stack-table td.lab-cell-actions {
+    order: 2;
+    width: auto;
+    margin-left: auto;
+  }
+  .lab-stack-table td.lab-col-optional,
+  .lab-stack-table td.lab-stack-empty {
+    display: none;
+  }
+  .lab-stack-table td.lab-cell-switch {
+    display: inline-flex;
+    align-items: center;
+  }
+  .lab-stack-table td.lab-table-empty {
+    flex: 1 1 100%;
+    margin-top: 0;
+    text-align: center !important;
+  }
+  .lab-stack-table tr.lab-row-selected {
+    background: var(--accent-soft);
+  }
+  .lab-stack-table tr.lab-row-selected td {
+    background: none;
+  }
 }

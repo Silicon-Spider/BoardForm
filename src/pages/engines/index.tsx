@@ -9,7 +9,7 @@ import { enginesRepo, importEngineFile, useEngines, useNetworks, useSetting } fr
 import type { EngineKind, EngineRecord } from "@/types";
 import { plural } from "@/utils/format";
 import { pickFile } from "@/utils/misc";
-import { duplicateEngine, errorMessage, exportEngine, restoreStarterEngines } from "./actions";
+import { duplicateEngine, errorMessage, exportEngine, restoreStarterEngines, restoredStartersMessage } from "./actions";
 import { EngineCard, SkeletonCard, type CardAction } from "./EngineCard";
 import {
   ENGINE_KINDS,
@@ -44,7 +44,21 @@ export default function EnginesPage({ query }: PageProps) {
   const [storedSort, setStoredSort] = useSetting<string>(SORT_SETTING, "updated");
   const kind: KindFilter = isKindFilter(storedKind) ? storedKind : "all";
   const sort: LibrarySort = isLibrarySort(storedSort) ? storedSort : "updated";
-  const [search, setSearch] = useState("");
+  // The search text lives in "?q=" as well, so Back from the Workshop (or a reload) keeps it.
+  const urlSearch = query.get("q") ?? "";
+  const [search, setSearchState] = useState(urlSearch);
+  const writtenSearch = useRef(urlSearch);
+  useEffect(() => {
+    // The URL changed by itself (e.g. the "Engines" nav link): follow it.
+    if (urlSearch === writtenSearch.current) return;
+    writtenSearch.current = urlSearch;
+    setSearchState(urlSearch);
+  }, [urlSearch]);
+  const setSearch = useCallback((value: string) => {
+    setSearchState(value);
+    writtenSearch.current = value;
+    setQuery({ q: value || null });
+  }, []);
   const deferredSearch = useDeferredValue(search);
   const [importing, setImporting] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -155,8 +169,8 @@ export default function EnginesPage({ query }: PageProps) {
   const onRestore = async () => {
     setRestoring(true);
     try {
-      await restoreStarterEngines();
-      toast("Starter engines restored", { kind: "success", detail: "Blocky, Classic and Sprout are back in your library." });
+      const { message, detail } = restoredStartersMessage(await restoreStarterEngines());
+      toast(message, { kind: "success", detail });
     } catch (err) {
       toast("Could not restore the starter engines", { kind: "error", detail: errorMessage(err) });
     } finally {

@@ -483,12 +483,22 @@ body.workshop-resizing * {
   flex: none;
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  gap: 6px;
   min-height: 40px;
   padding: 0 6px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+}
+/* Only the tabs scroll sideways: the File menu must stay outside the scrolling box, which
+   would otherwise clip its drop-down. */
+.workshop-filetabs-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 .workshop-filetabs > .workshop-menu,

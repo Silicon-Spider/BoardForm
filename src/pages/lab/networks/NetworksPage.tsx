@@ -82,7 +82,7 @@ export function NetworksPage() {
             </div>
           )}
           <div className="lab-table-wrap">
-            <table className="table lab-networks-table">
+            <table className="table lab-networks-table lab-stack-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -113,10 +113,14 @@ export function NetworksPage() {
                           </span>
                         )}
                       </td>
-                      <td className="num">{n.hidden}</td>
+                      <td className="num" data-label="Hidden">
+                        {n.hidden}
+                      </td>
                       <td>{ACTIVATION_NAMES[n.activation]}</td>
                       <td className="num lab-col-optional">{formatBytes(n.sizeBytes)}</td>
-                      <td className="num">{formatLoss(n.stats.valLoss)}</td>
+                      <td className="num" data-label="Val loss">
+                        {formatLoss(n.stats.valLoss)}
+                      </td>
                       <td className="num lab-col-optional">{n.stats.positionsSeen > 0 ? formatCount(n.stats.positionsSeen) : "—"}</td>
                       <td className="lab-col-optional">
                         {n.parentId ? (

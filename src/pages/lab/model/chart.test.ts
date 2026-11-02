@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestPoint, buildRunChartData, withLivePoints, type ChartInputPoint } from "./chart";
+import { bestPoint, bestValidation, buildRunChartData, withLivePoints, type ChartInputPoint } from "./chart";
 
 const pt = (cycle: number, positions: number, trainLoss = 0.1, valLoss: number | null = null, lr = 0.001, epoch = 0): ChartInputPoint => ({
   cycle,
@@ -79,5 +79,20 @@ describe("bestPoint", () => {
       ]),
     ).toEqual({ x: 2, y: 1 });
     expect(bestPoint([])).toBeNull();
+  });
+});
+
+describe("bestValidation", () => {
+  it("ignores the starting network's measurement (epoch 0) and reports the first x of the minimum", () => {
+    const rows = buildRunChartData([
+      pt(0, 0, 0.2, 0.09, 0.001, 0), // measured before training: lower than any result here
+      pt(0, 500, 0.15, 0.09, 0.001, 0),
+      pt(0, 1000, 0.12, 0.2, 0.001, 1),
+      pt(0, 1500, 0.11, 0.2, 0.001, 1),
+      pt(0, 2000, 0.1, 0.15, 0.001, 2),
+      pt(0, 2500, 0.1, 0.15, 0.001, 2),
+    ]).rows;
+    expect(bestValidation(rows)).toEqual({ x: 2000, y: 0.15 });
+    expect(bestValidation(buildRunChartData([pt(0, 0, 0.2, 0.09), pt(0, 100, 0.2, 0.09)]).rows)).toBeNull();
   });
 });

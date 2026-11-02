@@ -5,7 +5,7 @@ import { ChessGame, OPENINGS, START_FEN, uciLineToSan, validateFen, type Opening
 import { BoardEditor, Icon, MiniBoard, Modal } from "@/components";
 import { NumberInput } from "./NumberInput";
 import { PlayIcon } from "./icons";
-import { RANDOM_PLIES_DEFAULT, RANDOM_PLIES_MAX, RANDOM_PLIES_MIN, checkStart, openingStart } from "./setup";
+import { RANDOM_PLIES_DEFAULT, RANDOM_PLIES_MAX, RANDOM_PLIES_MIN, checkStart } from "./setup";
 import type { StartPosition } from "./types";
 
 type Kind = StartPosition["kind"];
@@ -172,11 +172,8 @@ export function StartPositionField({ value, onChange, disabled }: { value: Start
     if (kind === "standard") onChange({ kind: "standard" });
     else if (kind === "random") onChange({ kind: "random", plies: RANDOM_PLIES_DEFAULT });
     else if (kind === "fen") onChange({ kind: "fen", fen: fenText });
-    else if (kind === "opening") {
-      const first = openingStart(OPENINGS[0].name);
-      if (first) onChange(first);
-      setOpeningsOpen(true);
-    }
+    // The opening is set when one is picked, so cancelling the picker keeps the previous start.
+    else if (kind === "opening") setOpeningsOpen(true);
   };
 
   return (

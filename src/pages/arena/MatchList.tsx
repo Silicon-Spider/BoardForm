@@ -105,7 +105,8 @@ function MatchCard({ record }: { record: MatchRecord }) {
   const total = record.totalGames;
   const score = scoreLine(record.config, record.results, info.labels, { final: status === "finished" || status === "aborted" });
   const running = status === "running" || status === "preparing";
-  const resumable = status === "pending" || status === "paused" || status === "interrupted";
+  // A match whose engine was deleted cannot be resumed (its page offers a rematch instead).
+  const resumable = (status === "pending" || status === "paused" || status === "interrupted") && info.exists.every(Boolean);
 
   const act = async (fn: () => Promise<void>, failure: string) => {
     setBusy(true);

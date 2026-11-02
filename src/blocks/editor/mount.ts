@@ -226,6 +226,9 @@ export function mountBlocksEditor(container: HTMLElement, opts: MountOptions): E
   };
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("pagehide", flush);
+  // Also on beforeunload: an edit delivered only at pagehide comes too late for the app to store it
+  // (the old document is torn down before an IndexedDB write started then can finish).
+  window.addEventListener("beforeunload", flush);
 
   load(opts.workspace);
 
@@ -282,6 +285,7 @@ export function mountBlocksEditor(container: HTMLElement, opts: MountOptions): E
       unpatchMedia();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
       ws.removeChangeListener(onWorkspaceEvent);
       Blockly.hideChaff();
       Blockly.DropDownDiv.hideWithoutAnimation();

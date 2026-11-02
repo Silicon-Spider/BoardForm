@@ -58,6 +58,7 @@ function validate(f: GenerateForm, ctx: { engines?: readonly EngineRecord[]; net
     else if (ctx.networkIds && !ctx.networkIds.has(f.networkId)) out.push("That network no longer exists — choose another one.");
   } else if (ctx.engines && !ctx.engines.some((e) => e.id === f.engineId)) out.push("That engine no longer exists — choose another one.");
   if (!hasAnyLimit(f.limits)) out.push("Set at least one search limit, for example 5,000 nodes.");
+  if (f.randomPlies >= f.maxPlies) out.push("Make the maximum game length longer than the random opening.");
   if (f.skipPlies >= f.maxPlies) out.push("Skip fewer plies than the maximum game length.");
   if (f.concurrency > ctx.maxWorkers) out.push(`Use at most ${ctx.maxWorkers} workers (your limit in Settings).`);
   return out;
@@ -212,11 +213,15 @@ export function GenerateDatasetDialog({
           <Field label="Save to" htmlFor="lab-gen-target">
             <select id="lab-gen-target" className="select" value={form.appendTo ?? ""} onChange={(e) => set({ appendTo: e.target.value || null })}>
               <option value="">A new dataset</option>
-              {(allDatasets ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
-                  Add to “{d.name}”
-                </option>
-              ))}
+              {(allDatasets ?? []).map((d) => {
+                // One writer per dataset: a dataset that is being generated cannot take more games now.
+                const busy = datasets.isGenerating(d.id) && d.id !== form.appendTo;
+                return (
+                  <option key={d.id} value={d.id} disabled={busy}>
+                    Add to “{d.name}”{busy ? " (being generated)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </Field>
           {!form.appendTo && (

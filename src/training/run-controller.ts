@@ -146,6 +146,8 @@ export class RunController {
   private lastFlush = 0;
   private writeChain: Promise<void> = Promise.resolve();
   private exited = false;
+  /** saveIdleStopSnapshot(): the run is not executing, so no live state / activity is published. */
+  private idle = false;
   // training points
   private lastPoint: { t: number; cycle: number; step: number; epoch: number; valLoss: number | null } | null = null;
   /** Latest trainer checkpoint not yet persisted (for an early write when the tab is hidden). */
@@ -189,6 +191,40 @@ export class RunController {
     this.abort.abort();
     if (this.trainer && this.trainerStarted) this.trainer.stop();
     return this.finished;
+  }
+
+  /**
+   * Stops a run that is not executing anywhere (paused, error, queued) instead of run(): like a
+   * stop during training, the best network trained in the current cycle so far (from the stored
+   * checkpoints) is kept as "<run> - cN (stopped …)". The caller holds the run's lock and writes
+   * the "stopped" status afterwards. Never publishes live state.
+   */
+  async saveIdleStopSnapshot(): Promise<void> {
+    this.idle = true;
+    try {
+      const c = this.rec.cycle;
+      if (this.rec.resume?.cycle !== c) return; // the cycle's training has not started
+      const ckpt = await this.loadCheckpoint(c);
+      if (!ckpt || (ckpt.cursor.epoch === 0 && ckpt.cursor.step === 0)) {
+        this.log("info", "Stopped before training made progress in this cycle; no new network was saved.");
+        await this.flushNow();
+        return;
+      }
+      const best = await this.loadBest(c);
+      const final: TrainCheckpoint = {
+        network: ckpt.float as FloatNetworkData,
+        optimizer: ckpt.optimizer as OptimizerStateData,
+        epoch: ckpt.cursor.epoch,
+        step: ckpt.cursor.step,
+        positionsSeen: ckpt.cursor.positionsSeen,
+        trainLoss: Number.NaN, // not stored with the checkpoint
+        valLoss: null,
+        finished: false,
+      };
+      await this.saveCycleNetwork(c, ckpt.plan, this.resultOf(final, best), await this.parentOf(c), { snapshot: true });
+    } finally {
+      this.exit();
+    }
   }
 
   /** Writes pending state now (the tab is being hidden and may be closed). */
@@ -381,7 +417,7 @@ export class RunController {
       throw err;
     }
     this.log("info", `Cycle ${c + 1}: self-play with ${engine.name}, ${remaining} game${remaining === 1 ? "" : "s"} on ${workers} worker${workers === 1 ? "" : "s"}.`);
-    this.ctx.registry.add(datasetId, { stop: () => this.requestStop("pause") });
+    this.ctx.registry.add(datasetId, { stop: () => this.requestStop("pause"), persist: () => writer.persistNow() });
     let progress: SelfPlayProgress = emptySelfPlayProgress(sp.games);
     try {
       const summary = await runSelfPlayJob({
@@ -670,8 +706,30 @@ export class RunController {
     return this.config.loop.enabled ? `cycle ${c + 1} ` : "";
   }
 
+  /**
+   * True when the newest network of cycle `c` already holds exactly this result (a run stopped
+   * twice without better weights in between). Within an unfinished cycle that network can only
+   * be an earlier stop snapshot; positionsSeen grows with every step, so equal counts mean the
+   * same training state.
+   */
+  private async sameAsLastSnapshot(c: number, result: CycleResult, parent: NetworkRecord | null): Promise<boolean> {
+    const last = this.cycleNetwork(c);
+    if (!last) return false;
+    const rec = await this.deps.networks.get(last.networkId);
+    return (
+      !!rec &&
+      rec.stats.positionsSeen === (parent?.stats.positionsSeen ?? 0) + result.positionsSeen &&
+      rec.stats.epochs === (parent?.stats.epochs ?? 0) + result.epoch
+    );
+  }
+
   private async saveCycleNetwork(c: number, plan: CyclePlan, result: CycleResult, parent: NetworkRecord | null, opts: { snapshot: boolean }): Promise<void> {
     const deps = this.deps;
+    if (opts.snapshot && (await this.sameAsLastSnapshot(c, result, parent))) {
+      this.log("info", "The best network of this cycle so far is already saved; no second copy was made.");
+      await this.flushNow();
+      return;
+    }
     const epochs = this.config.hyper.epochs;
     const quantized = result.quantized ?? quantizeNetwork(result.float);
     const id = deps.newId();
@@ -968,7 +1026,7 @@ export class RunController {
   }
 
   private publishLive(): void {
-    if (this.exited) return;
+    if (this.exited || this.idle) return;
     const state: LiveRunState = { ...this.live, cycle: this.rec.cycle };
     setLiveRun(state);
     this.deps.notify.setActivity({
@@ -983,6 +1041,7 @@ export class RunController {
 
   private activityDetail(s: LiveRunState): string {
     const prefix = this.config.loop.enabled ? `Cycle ${s.cycle + 1} – ` : "";
+    if (s.phase === "selfplay" && s.selfPlay?.workers === 0 && s.selfPlay.boards.length === 0) return `${prefix}self-play: preparing the engine`;
     if (s.phase === "selfplay" && s.selfPlay) return `${prefix}self-play ${s.selfPlay.gamesDone}/${s.selfPlay.gamesTotal ?? "∞"} games`;
     if (s.phase === "training" && s.train) return `${prefix}training epoch ${Math.min(s.train.epoch + 1, s.train.epochs)}/${s.train.epochs}`;
     if (s.phase === "training") return `${prefix}loading training data`;

@@ -45,7 +45,7 @@ With all pieces on the board (phase 24) the second block is worth 10; halfway (p
 - **Plug values into slots.** Number slots take number blocks, condition slots take yes/no blocks and square slots take blocks from the **Squares** category; a block that doesn't fit won't snap in. Any number slot accepts any number block, so `add (10) points` becomes `add (number of our passed pawns) points` by dropping a block into the slot.
 - **Right-click a block** for **Duplicate**, **Add Comment**, **Collapse Block**, **Disable Block** and **Delete Block**. A disabled block is ignored, which is handy for testing an idea on and off. Terms with a comment show a **?** icon: click it to read the comment.
 - **Undo** with <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd> on a Mac). Drag blocks to the trash can to delete them.
-- **Move around** by dragging the background or scrolling; zoom with the **+** / **−** buttons in the corner.
+- **Move around** by dragging the background or scrolling; zoom with the **+** / **−** buttons in the corner or with <kbd>Ctrl</kbd> + scroll.
 
 Every change is saved automatically and the evaluation is regenerated a moment later.
 
@@ -125,7 +125,7 @@ The term became a function that is called once with `WHITE` and once with `BLACK
 
 ## More examples
 
-**A bonus that grows as pawns advance.** From **For each piece**, drag `for each of our pawns` into a term. Inside it put `add … in the middlegame and 0 in the endgame` and drop **pick by rank** (Math) into the middlegame slot, with **its rank** (For each piece) in its rank slot. Each of our pawns now earns the number listed for the rank it stands on: 10 on the 3rd rank, 20 on the 4th … 100 on the 7th, by default.
+**A bonus that grows as pawns advance.** From **For each piece**, drag `for each of our [knights]` into a term and switch it to **pawns**. Inside it put `add … in the middlegame and 0 in the endgame` and drop **pick by rank** (Math) into the middlegame slot, with **its rank** (For each piece) in its rank slot. Each of our pawns now earns the number listed for the rank it stands on: 10 on the 3rd rank, 20 on the 4th … 100 on the 7th, by default.
 
 **Rooks on the 7th rank.** Drag the ready-made term **Rook on the 7th** in: `add 20 points for each (number of our rooks on our 7th rank)`.
 

@@ -29,8 +29,20 @@ export function PerformanceSection() {
 function HashRow() {
   const id = useId();
   const [hashMb, setHashMb] = useDefaultHashMb();
-  // Text being typed; null shows the saved value. Valid values are saved as you type.
+  // Text being typed; null shows the saved value. A valid value is saved once typing pauses (or on
+  // blur), so the steps on the way ("2", "20", "200" while typing "2000") are never saved, and an
+  // invalid final value leaves the saved one unchanged.
   const [draft, setDraft] = useState<string | null>(null);
+  const save = useMemo(() => debounce((mb: number) => setHashMb(mb), 600), [setHashMb]);
+  useEffect(() => {
+    // Leaving the page (or closing the tab) right after typing still saves the value.
+    const onHide = () => save.flush();
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      save.flush();
+    };
+  }, [save]);
   const text = draft ?? String(hashMb);
   const invalid = draft !== null && parseHashMb(draft) === null;
 
@@ -61,9 +73,16 @@ function HashRow() {
             onChange={(e) => {
               setDraft(e.target.value);
               const v = parseHashMb(e.target.value);
-              if (v !== null && v !== hashMb) setHashMb(v);
+              if (v !== null && v !== hashMb) save(v);
+              else save.cancel(); // invalid, or back to the saved value
             }}
-            onBlur={() => setDraft(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save.flush();
+            }}
+            onBlur={() => {
+              save.flush();
+              setDraft(null);
+            }}
           />
           <span className="settings-unit">MB</span>
         </div>

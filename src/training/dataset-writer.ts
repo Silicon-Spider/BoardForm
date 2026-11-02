@@ -169,6 +169,18 @@ export class DatasetWriter {
     });
   }
 
+  /**
+   * Stores the chunk being filled and the record counts now, without starting a new chunk (the
+   * page is being hidden and may be closed before the next partial flush).
+   */
+  persistNow(): Promise<void> {
+    if (this.closed) return this.queue;
+    return this.enqueue(async () => {
+      await this.writePartial();
+      await this.updateRecord();
+    });
+  }
+
   /** flush() and stop the timers. Further add() calls reject. */
   async close(): Promise<void> {
     if (this.closed) return this.queue;

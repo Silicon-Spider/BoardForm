@@ -158,7 +158,8 @@ export function OverviewPage() {
                       <Link to={`/lab/networks/${n.id}`} className="lab-recent-row">
                         <span className="lab-recent-name truncate">{n.name}</span>
                         <span className="lab-recent-meta">
-                          HL{n.hidden} {ACTIVATION_NAMES[n.activation]} · loss {formatLoss(n.stats.valLoss)}
+                          HL{n.hidden} {ACTIVATION_NAMES[n.activation]}
+                          {n.stats.valLoss !== null ? ` · loss ${formatLoss(n.stats.valLoss)}` : n.builtin ? " · starter" : ""}
                         </span>
                         <span className="lab-recent-time small faint">
                           <TimeAgo ts={n.createdAt} />

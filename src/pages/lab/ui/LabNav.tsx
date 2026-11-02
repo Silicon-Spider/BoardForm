@@ -29,7 +29,7 @@ export function LabNav({ active }: { active: LabSection }) {
         ))}
       </nav>
       {active !== "new" && (
-        <Link to="/lab/new" className="btn btn-primary btn-sm lab-nav-new">
+        <Link to="/lab/new" className="btn btn-primary btn-sm lab-nav-new" aria-label="New training run" title="New training run">
           <Icon name="plus" />
           <span>New training run</span>
         </Link>

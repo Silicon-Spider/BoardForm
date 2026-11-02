@@ -12,6 +12,7 @@ import { ActionMenu } from "../ui/ActionMenu";
 import { LoadingBlock, RunStatusBadge, Switch, TimeAgo } from "../ui/common";
 import { LabIcon } from "../ui/icons";
 import { DeleteRunDialog } from "./DeleteRunDialog";
+import { useOptimisticToggle } from "./hooks";
 
 export function RunsPage() {
   const runs = useTrainingRuns();
@@ -44,7 +45,7 @@ export function RunsPage() {
       ) : (
         <div className="panel">
           <div className="lab-table-wrap">
-            <table className="table lab-runs-table">
+            <table className="table lab-runs-table lab-stack-table">
               <thead>
                 <tr>
                   <th>Name</th>
@@ -99,6 +100,7 @@ function RunRow({
       setBusy(false);
     }
   };
+  const [autoResume, savingAuto, setAuto] = useOptimisticToggle(run.autoResume, (on) => training.setAutoResume(run.id, on), "Could not change auto-resume");
   const canStart = !activeHere && canStartStatus(status);
   const canPause = activeHere && status !== "paused";
   const canStop = (activeHere || status === "paused") && status !== "finished" && status !== "stopped";
@@ -113,8 +115,12 @@ function RunRow({
       <td>
         <RunStatusBadge status={status} live={activeHere && isActiveStatus(status)} />
       </td>
-      <td className="num">{cycleShort(cycle, run.config)}</td>
-      <td className="num">{formatLoss(loss)}</td>
+      <td className="num" data-label="Cycle">
+        {cycleShort(cycle, run.config)}
+      </td>
+      <td className="num" data-label="Val loss">
+        {formatLoss(loss)}
+      </td>
       <td className="lab-col-optional">
         {run.networkId ? (
           net ? (
@@ -131,12 +137,12 @@ function RunRow({
       <td className="lab-col-optional small muted">
         <TimeAgo ts={run.updatedAt} />
       </td>
-      <td>
+      <td data-label="Auto-resume" className="lab-cell-switch">
         <Switch
-          checked={run.autoResume}
+          checked={autoResume}
           aria-label={`Keep training “${run.config.name}” when I reopen the app`}
-          disabled={busy}
-          onChange={(on) => void act(() => training.setAutoResume(run.id, on), "Could not change auto-resume")}
+          disabled={savingAuto}
+          onChange={setAuto}
         />
       </td>
       <td className="lab-cell-actions">

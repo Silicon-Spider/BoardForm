@@ -80,7 +80,9 @@ export function EvalTool({
   const terms = (result?.trace ?? []).filter((t) => t.label.toLowerCase() !== "total");
   const totalLine = result?.trace?.find((t) => t.label.toLowerCase() === "total");
   const termSum = terms.reduce((s, t) => s + t.white - t.black, 0);
-  const total = result?.score ?? totalLine?.white ?? (terms.length ? termSum : null);
+  // The breakdown's total row is the engine's own trailing "total" line (ABI: White-POV total);
+  // without one, cb_eval's score, else the sum of the terms.
+  const total = totalLine?.white ?? result?.score ?? (terms.length ? termSum : null);
   const fallback = terms.some((t) => FALLBACK_LABEL.test(t.label));
 
   return (
@@ -158,6 +160,12 @@ export function EvalTool({
           {total !== null && terms.length > 0 && termSum !== total && (
             <p className="small faint">
               The terms add up to {signedInt(termSum)} cp; the remaining {signedInt(total - termSum)} cp come from code that is not traced.
+            </p>
+          )}
+          {totalLine && result.score !== null && totalLine.white !== result.score && (
+            <p className="small text-warn">
+              cb_eval returned {signedInt(result.score)} cp but the breakdown's total is {signedInt(totalLine.white)} cp: the evaluation gives a different result
+              while tracing.
             </p>
           )}
           <p className="small faint">Values in centipawns (100 = one pawn); positive is good for that side.</p>

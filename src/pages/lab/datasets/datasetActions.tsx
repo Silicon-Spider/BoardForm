@@ -91,8 +91,8 @@ export async function deleteDatasetFlow(d: DatasetRecord, ctx: { confirm: Confir
         </p>
         {runs.length > 0 && (
           <div className="callout warn">
-            Used by {runs.length === 1 ? "the run" : `${runs.length} runs`} <strong>{runs.map((r) => r.config.name).join(", ")}</strong> — later cycles train
-            without it.
+            Used by {runs.length === 1 ? "the run" : `${runs.length} runs`} <strong>{runs.map((r) => r.config.name).join(", ")}</strong>. From now on{" "}
+            {runs.length === 1 ? "it trains" : "they train"} without these positions; a run with no other data cannot continue.
           </div>
         )}
       </div>

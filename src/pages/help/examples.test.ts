@@ -12,11 +12,13 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { Chess } from "chess.js";
 import { describe, expect, it } from "vitest";
+import { block, num, rankZone, term, workspace } from "@/blocks/builder";
+import { generateEvalSource } from "@/blocks/generator";
 import { mirrorFen } from "@/chess";
 import type { AscDiagnosticMessage } from "@/compiler/asc-types";
 import { loadAsc } from "@/compiler/load-asc.js";
-import { templateFiles } from "@/engine-host/templates";
-import { HELP_TASKS, SPEC_TOPICS, TOPICS, TOPIC_SOURCES, getArticle } from "./topics";
+import { templateFiles, variantFiles } from "@/engine-host/templates";
+import { HELP_TASKS, SPEC_SOURCES, SPEC_TOPICS, TOPICS, TOPIC_SOURCES, getArticle } from "./topics";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 
@@ -77,6 +79,17 @@ describe("help topics", () => {
       expect(new Set(a.anchors).size, `${t.id} has duplicate anchors`).toBe(a.anchors.length);
       expect(a.html).not.toContain("Missing reference");
     }
+  });
+
+  it("render tables without broken code spans", () => {
+    // A "|" inside `code` in a table row ends the cell unless it is written as "\|".
+    const problems: string[] = [];
+    for (const t of TOPICS) {
+      for (const m of getArticle(t.id)!.html.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)) {
+        if (m[1]!.includes("`") || m[1]!.includes("\\|")) problems.push(`${t.id}: ${m[1]!.slice(0, 80)}`);
+      }
+    }
+    expect(problems).toEqual([]);
   });
 
   it("include the specs they reference", () => {
@@ -158,6 +171,77 @@ describe("help links", () => {
       problems.push(`${from}: ${href}`);
     }
     expect(problems).toEqual([]);
+  });
+});
+
+// ───────────────────────────── names of the engine API ─────────────────────────────
+
+/** Inline `code` spans of a topic's Markdown (fenced blocks removed). */
+function inlineCode(markdown: string): string[] {
+  const withoutFences = markdown.replace(/^```[^\n]*\n[\s\S]*?^```/gm, "");
+  return [...withoutFences.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]!.trim());
+}
+
+/** Everything a topic may legitimately name: the engine sources and the specs. */
+const ENGINE_CORPUS = [...Object.values(templateFiles), ...Object.values(variantFiles), ...Object.values(SPEC_SOURCES)].join("\n");
+
+/**
+ * Calls in inline code that are not engine API on purpose: the reader's own helpers in the
+ * scratch walkthrough, AssemblyScript built-ins, math in formulas and C syntax in the ABI tips.
+ */
+const NOT_ENGINE_API = new Set([
+  "__attribute__",
+  "sigmoid", "log", "erf", "min", "max", "abs", "popcnt", "ctz", "clz", "bswap", "unchecked", "assert", "ceil",
+  "makeMove", "unmakeMove", "generateLegalMoves", "firstMove", "moveToUci", "moveAt", "inCheck", "quiescence",
+]);
+
+describe("names of the engine API in the topics", () => {
+  it("exist in the engine sources or the specs", () => {
+    const problems: string[] = [];
+    for (const t of TOPICS) {
+      for (const span of inlineCode(TOPIC_SOURCES[t.id]!)) {
+        // `name(...)`, `pos.name(...)` and SCREAMING_CASE constants such as `MATE_BOUND`.
+        const call = /^(?:pos\.)?([A-Za-z_]\w*)\s*\(/.exec(span)?.[1];
+        const constant = /^[A-Z][A-Z0-9]*_[A-Z0-9_]+$/.test(span) ? span : undefined;
+        const name = call ?? constant;
+        if (!name || (call && NOT_ENGINE_API.has(name))) continue;
+        if (!new RegExp(`\\b${name}\\b`).test(ENGINE_CORPUS)) problems.push(`${t.id}: \`${span}\` — "${name}" is not in the engine sources`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("include the exact tuning constants of search.ts", () => {
+    const search = templateFiles["search.ts"]!;
+    const table = TOPIC_SOURCES["full-engine"]!.split("## Tuning knobs")[1]!.split("\n## ")[0]!;
+    const rows = [...table.matchAll(/^\| `([A-Z_]+)`(?: \/ `([A-Z_]+)`)? \| ([\d ]+)(?: \/ (\d+))? \|/gm)];
+    expect(rows.length).toBeGreaterThanOrEqual(8);
+    for (const [, a, b, va, vb] of rows) {
+      for (const [name, value] of [[a, va], [b, vb]] as const) {
+        if (!name) continue;
+        const declared = new RegExp(`const ${name}: (?:i32|f64) = (\\d+);`).exec(search)?.[1];
+        expect(declared, `${name} in search.ts`).toBe(value!.replace(/ /g, ""));
+      }
+    }
+  });
+});
+
+// ───────────────────────────── the blocks example ─────────────────────────────
+
+describe("the blocks topic's generated eval.ts", () => {
+  it("is exactly what the generator writes for the worked example", () => {
+    const example = term("Pawn on our 7th rank", [
+      block("controls_if", {
+        inputs: {
+          IF0: block("cb_any_on", { fields: { SIDE: "US", PIECE: "PAWN" }, inputs: { ZONE: rankZone(7) } }),
+          DO0: block("cb_add", { fields: { OP: "ADD" }, inputs: { VALUE: num(1) } }),
+        },
+      }),
+    ]);
+    const generated = generateEvalSource(workspace([block("cb_evaluation", { inputs: { TERMS: example } })]));
+    expect(generated.errors).toEqual([]);
+    const shown = getArticle("blocks")!.codeBlocks.find((b) => b.flags.includes("eval"))!.code;
+    expect(shown.trimEnd()).toBe(generated.code.trimEnd());
   });
 });
 

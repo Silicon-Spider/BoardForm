@@ -4,7 +4,7 @@
 import { SEED_FLAG_KEY, ensureSeeded, enginesRepo, exportEngineFile, newId, settingsRepo } from "@/storage";
 import type { EngineRecord } from "@/types";
 import { downloadBlob, slugify } from "@/utils/misc";
-import { copyName, duplicateEngineRecord } from "./records";
+import { copyName, duplicateEngineRecord, redundantRestoredStarters } from "./records";
 
 /** A user-facing message for any thrown value. */
 export function errorMessage(err: unknown): string {
@@ -19,12 +19,12 @@ export async function duplicateEngine(engine: EngineRecord, takenNames: readonly
   return copy;
 }
 
-/** File name of an exported engine: "my-engine.cbengine.json". */
+/** File name of an exported engine: "my-engine.engine.json" (the same name the Workshop's Export uses). */
 export function engineFileName(name: string): string {
-  return `${slugify(name)}.cbengine.json`;
+  return `${slugify(name)}.engine.json`;
 }
 
-/** Downloads the engine (sources / blocks / module and its network) as a .cbengine.json file. */
+/** Downloads the engine (sources / blocks / module and its network) as a .engine.json file. */
 export async function exportEngine(engine: EngineRecord): Promise<string> {
   const blob = await exportEngineFile(engine.id);
   const fileName = engineFileName(engine.name);
@@ -32,8 +32,28 @@ export async function exportEngine(engine: EngineRecord): Promise<string> {
   return fileName;
 }
 
-/** Adds fresh copies of the starter engines (Blocky, Classic, Sprout). */
-export async function restoreStarterEngines(): Promise<void> {
+/**
+ * Brings back the starter engines (Blocky, Classic, Sprout) that were deleted or changed, as fresh
+ * copies. Starters that are still in the library unchanged are not doubled: seeding creates all
+ * three, and the copies that already have an identical twin are removed again. Resolves with the
+ * names of the engines that were added (empty when every starter was already there).
+ */
+export async function restoreStarterEngines(): Promise<string[]> {
+  const before = await enginesRepo.list();
+  const known = new Set(before.map((e) => e.id));
   await settingsRepo.remove(SEED_FLAG_KEY);
   await ensureSeeded();
+  const fresh = (await enginesRepo.list()).filter((e) => e.builtin && !known.has(e.id));
+  const redundant = new Set(redundantRestoredStarters(before, fresh));
+  for (const id of redundant) await enginesRepo.remove(id);
+  return fresh.filter((e) => !redundant.has(e.id)).map((e) => e.name);
+}
+
+/** The toast for a finished restore: what came back, or that nothing was missing. */
+export function restoredStartersMessage(added: readonly string[]): { message: string; detail: string } {
+  if (added.length === 0) {
+    return { message: "Your starter engines are all here", detail: "Blocky, Classic and Sprout are already in your library, unchanged." };
+  }
+  const names = added.length === 1 ? added[0] : `${added.slice(0, -1).join(", ")} and ${added[added.length - 1]}`;
+  return { message: "Starter engines restored", detail: `${names} ${added.length === 1 ? "is" : "are"} back in your library.` };
 }

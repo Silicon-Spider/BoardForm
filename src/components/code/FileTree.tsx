@@ -49,8 +49,10 @@ interface NameEditorProps {
   /** The file being renamed. */
   current?: string;
   label: string;
-  onCommit(path: string): void;
-  onCancel(): void;
+  /** `byKeyboard`: Enter (move focus back into the tree), not leaving the field. */
+  onCommit(path: string, byKeyboard: boolean): void;
+  /** `byKeyboard`: Escape (move focus back into the tree), not leaving the field. */
+  onCancel(byKeyboard: boolean): void;
 }
 
 function NameEditor({ initial, depth, existing, current, label, onCommit, onCancel }: NameEditorProps) {
@@ -72,15 +74,19 @@ function NameEditor({ initial, depth, existing, current, label, onCommit, onCanc
     input.setSelectionRange(start, dot > start ? dot : initial.length);
   }, [initial]);
 
-  const finish = (commit: boolean) => {
+  const finish = (commit: boolean, byKeyboard: boolean) => {
     if (done.current) return;
     if (commit && error) {
-      setTried(true);
-      return;
+      if (byKeyboard) {
+        setTried(true);
+        return;
+      }
+      // Leaving the field keeps a valid name and drops anything else.
+      commit = false;
     }
     done.current = true;
-    if (commit && path !== current) onCommit(path);
-    else onCancel();
+    if (commit && path !== current) onCommit(path, byKeyboard);
+    else onCancel(byKeyboard);
   };
 
   return (
@@ -100,20 +106,13 @@ function NameEditor({ initial, depth, existing, current, label, onCommit, onCanc
             e.stopPropagation();
             if (e.key === "Enter") {
               e.preventDefault();
-              finish(true);
+              finish(true, true);
             } else if (e.key === "Escape") {
               e.preventDefault();
-              finish(false);
+              finish(false, true);
             }
           }}
-          onBlur={() => {
-            // Leaving the field keeps a valid name and drops anything else.
-            if (!error) finish(true);
-            else {
-              done.current = true;
-              onCancel();
-            }
-          }}
+          onBlur={() => finish(true, false)}
         />
       </div>
       {showError ? (
@@ -160,8 +159,13 @@ function Menu({ state, onClose }: { state: MenuState; onClose(focusRow: boolean)
     const left = Math.max(8, Math.min(state.x, window.innerWidth - w - 8));
     const top = state.y + h + 8 > window.innerHeight ? Math.max(8, state.y - h - 4) : state.y;
     setPos({ left, top });
-    el.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }, [state]);
+
+  // Focus the first item once the menu is placed: browsers ignore focus() on the hidden,
+  // not-yet-measured menu.
+  useLayoutEffect(() => {
+    if (pos) ref.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus({ preventScroll: true });
+  }, [pos]);
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -239,7 +243,11 @@ export function FileTree(props: FileTreeProps): JSX.Element {
   const [editing, setEditing] = useState<Editing>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
-  const pendingFocus = useRef<string | null>(null);
+  /**
+   * A row to focus as soon as it is rendered: a file the parent is about to add (create /
+   * rename). It expires, so a file that never shows up cannot steal focus later.
+   */
+  const pendingFocus = useRef<{ key: string; until: number } | null>(null);
   const typeahead = useRef({ text: "", at: 0 });
 
   const editable = !readOnly;
@@ -275,19 +283,27 @@ export function FileTree(props: FileTreeProps): JSX.Element {
   // The single tab stop of the tree.
   const tabKey = (focusKey && rowByKey.has(focusKey) ? focusKey : null) ?? (active && rowByKey.has("f:" + active) ? "f:" + active : rows[0]?.key ?? null);
 
+  /** Focuses a row now when it is rendered, else as soon as it shows up. */
   const focusRow = (key: string | null) => {
     if (!key) return;
     setFocusKey(key);
-    pendingFocus.current = key;
-    // Focus now when the row exists, or after the next render (e.g. after expanding).
-    rowRefs.current.get(key)?.focus();
+    const el = rowRefs.current.get(key);
+    if (el) {
+      pendingFocus.current = null;
+      el.focus();
+    } else pendingFocus.current = { key, until: Date.now() + 2000 };
   };
   useLayoutEffect(() => {
-    const key = pendingFocus.current;
-    if (!key) return;
-    const el = rowRefs.current.get(key);
-    if (el && document.activeElement !== el) el.focus();
+    const pending = pendingFocus.current;
+    if (!pending) return;
+    if (Date.now() > pending.until) {
+      pendingFocus.current = null;
+      return;
+    }
+    const el = rowRefs.current.get(pending.key);
+    if (!el) return; // not rendered yet
     pendingFocus.current = null;
+    if (document.activeElement !== el) el.focus();
   });
 
   const toggleFolder = (path: string, open?: boolean) =>
@@ -319,13 +335,9 @@ export function FileTree(props: FileTreeProps): JSX.Element {
       confirmLabel: "Delete file",
       danger: true,
     });
+    // Focus the neighbour before the parent removes the row, so focus never drops to <body>.
+    focusRow(ok ? neighbour : "f:" + path);
     if (ok) onDelete?.(path);
-    const target = ok ? neighbour : "f:" + path;
-    if (target) {
-      pendingFocus.current = target;
-      setFocusKey(target);
-      rowRefs.current.get(target)?.focus();
-    }
   };
 
   const menuItems = (row: Row): MenuItem[] => {
@@ -360,6 +372,7 @@ export function FileTree(props: FileTreeProps): JSX.Element {
   const openMenu = (row: Row, x: number, y: number) => {
     const items = menuItems(row);
     if (items.length === 0) return;
+    pendingFocus.current = null; // the menu takes the focus
     setFocusKey(row.key);
     setMenu({ key: row.key, x, y, items });
   };
@@ -450,16 +463,16 @@ export function FileTree(props: FileTreeProps): JSX.Element {
         depth={depth}
         existing={files}
         label="New file name"
-        onCommit={(path) => {
+        onCommit={(path, byKeyboard) => {
           setEditing(null);
           onCreate?.(path);
-          // Focus the new file once it shows up (the parent adds it to `files`).
-          pendingFocus.current = "f:" + path;
-          setFocusKey("f:" + path);
+          // Focus the new file once it shows up (the parent adds it to `files`), unless the
+          // user left the field by clicking somewhere else.
+          if (byKeyboard) focusRow("f:" + path);
         }}
-        onCancel={() => {
+        onCancel={(byKeyboard) => {
           setEditing(null);
-          focusRow(editing.folder ? "d:" + editing.folder : tabKey);
+          if (byKeyboard) focusRow(editing.folder ? "d:" + editing.folder : tabKey);
         }}
       />
     );
@@ -512,15 +525,15 @@ export function FileTree(props: FileTreeProps): JSX.Element {
                     existing={files}
                     current={node.path}
                     label={`Rename ${node.path}`}
-                    onCommit={(to) => {
+                    onCommit={(to, byKeyboard) => {
                       setEditing(null);
                       onRename?.(node.path, to);
-                      pendingFocus.current = "f:" + to;
-                      setFocusKey("f:" + to);
+                      if (byKeyboard) focusRow("f:" + to);
+                      else setFocusKey("f:" + to);
                     }}
-                    onCancel={() => {
+                    onCancel={(byKeyboard) => {
                       setEditing(null);
-                      focusRow(key);
+                      if (byKeyboard) focusRow(key);
                     }}
                   />
                 );

@@ -44,7 +44,7 @@ export function NetworkHistory({
 
   return (
     <div className="lab-table-wrap">
-      <table className="table lab-history">
+      <table className="table lab-history lab-stack-table">
         <thead>
           <tr>
             <th className="num">Cycle</th>
@@ -60,7 +60,9 @@ export function NetworkHistory({
             const missing = networks !== undefined && !net;
             return (
               <tr key={`${h.networkId}-${h.cycle}-${h.createdAt}`}>
-                <td className="num">{h.cycle + 1}</td>
+                <td className="num" data-label="Cycle">
+                  {h.cycle + 1}
+                </td>
                 <td className="lab-cell-name lab-history-name">
                   <span className="lab-history-title">
                     {missing ? (
@@ -80,8 +82,10 @@ export function NetworkHistory({
                     <TimeAgo ts={h.createdAt} />
                   </span>
                 </td>
-                <td className="num">{formatLoss(h.valLoss)}</td>
-                <td>
+                <td className="num" data-label="Val loss">
+                  {formatLoss(h.valLoss)}
+                </td>
+                <td className={h.gating ? undefined : "lab-stack-empty"}>
                   {h.gating ? (
                     <span className="lab-gating-cell" title={`Scored ${formatScorePct(h.gating.score, 1)} in ${h.gating.games} games against the previous network`}>
                       <span className={h.gating.accepted ? "badge badge-ok" : "badge badge-danger"}>{h.gating.accepted ? "Accepted" : "Rejected"}</span>

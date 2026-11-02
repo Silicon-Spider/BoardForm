@@ -69,7 +69,9 @@ function MatchView({ record, live }: { record: MatchRecord; live: LiveMatchState
   const now = useNow(1000, ticking);
 
   const running = status === "running" || status === "preparing" || status === "stopping";
-  const canStart = status === "pending" || status === "paused" || status === "interrupted";
+  // A match whose engine was deleted can never continue (the runner refuses to start it).
+  const missingEngine = info.exists.some((e) => !e);
+  const canStart = (status === "pending" || status === "paused" || status === "interrupted") && !missingEngine;
   // While stopping, Pause and Abort stay visible but disabled.
   const canPause = status === "running" || status === "preparing" || status === "remote" || status === "stopping";
   const canAbort = canPause || status === "paused" || status === "interrupted";
@@ -190,7 +192,15 @@ function MatchView({ record, live }: { record: MatchRecord; live: LiveMatchState
         </div>
       </header>
 
-      <Notices record={record} status={status} live={live} lastError={lastError} onResume={() => act("start", () => arena.start(record.id), "Could not start the match")} />
+      <Notices
+        record={record}
+        status={status}
+        live={live}
+        lastError={lastError}
+        missingEngine={missingEngine}
+        onResume={() => act("start", () => arena.start(record.id), "Could not start the match")}
+        onRematch={() => setQuery({ new: "1", from: record.id })}
+      />
 
       <div className="arena-detail-grid">
         <div className="arena-detail-main">
@@ -201,18 +211,26 @@ function MatchView({ record, live }: { record: MatchRecord; live: LiveMatchState
               <div className="panel-header">
                 <span id="arena-live-title">Live games</span>
                 <span className="spacer" />
-                {live.phase === "stopping" ? (
+                {live.games.length === 0 ? null : live.phase === "stopping" ? (
                   <Spinner label={live.status ?? "Stopping…"} />
-                ) : live.games.length > 0 ? (
+                ) : (
                   <span className="small muted">Click a board to watch it</span>
-                ) : null}
+                )}
               </div>
               <div className="panel-body">
                 {live.games.length > 0 ? (
                   <LiveBoards games={live.games} colorOf={colorOf} lowTimeFor={lowTimeFor} onOpen={setLiveSlot} />
                 ) : (
                   <div className="arena-live-waiting muted">
-                    <Spinner label={live.phase === "preparing" ? (live.status ?? "Preparing the engines…") : "Starting the engines…"} />
+                    <Spinner
+                      label={
+                        live.phase === "preparing"
+                          ? (live.status ?? "Preparing the engines…")
+                          : live.phase === "stopping"
+                            ? (live.status ?? "Stopping…")
+                            : "Starting the engines…"
+                      }
+                    />
                   </div>
                 )}
               </div>
@@ -266,7 +284,16 @@ function MatchView({ record, live }: { record: MatchRecord; live: LiveMatchState
   );
 }
 
-function Notices({ record, status, live, lastError, onResume }: { record: MatchRecord; status: MatchDisplayStatus; live: LiveMatchState | null; lastError: string | null; onResume: () => void }) {
+function Notices(props: {
+  record: MatchRecord;
+  status: MatchDisplayStatus;
+  live: LiveMatchState | null;
+  lastError: string | null;
+  missingEngine: boolean;
+  onResume: () => void;
+  onRematch: () => void;
+}) {
+  const { record, status, live, lastError, missingEngine, onResume, onRematch } = props;
   const engines = useEngineMap();
   const errorEngineId = matchExtras(record).lastErrorEngineId ?? null;
   const errorEngine = errorEngineId ? (engines?.get(errorEngineId) ?? null) : null;
@@ -274,6 +301,21 @@ function Notices({ record, status, live, lastError, onResume }: { record: MatchR
     return (
       <div className="callout arena-notice" data-testid="arena-remote">
         <strong>This match is running in another tab.</strong> Results appear here as games finish; the live boards are shown in that tab. You can still pause or abort it from here.
+      </div>
+    );
+  }
+  if (missingEngine && (status === "pending" || status === "paused" || status === "interrupted")) {
+    return (
+      <div className="callout warn arena-notice" data-testid="arena-missing-engine">
+        <div className="row-wrap">
+          <span className="grow">
+            <strong>An engine in this match was deleted</strong>, so the match cannot continue.{" "}
+            {record.results.length > 0 ? "Its finished games and standings are kept. " : ""}A rematch plays the same settings with another engine.
+          </span>
+          <button className="btn btn-sm btn-primary" onClick={onRematch}>
+            <Icon name="reset" size={13} /> Rematch
+          </button>
+        </div>
       </div>
     );
   }
@@ -334,6 +376,10 @@ function Summary({ record, info, status, now }: { record: MatchRecord; info: Par
   const duel = record.config.participants.length === 2;
   const a = rows.find((r) => r.participant === 0);
   const b = rows.find((r) => r.participant === 1);
+  // Everyone ranked first (equal points, tie-break and wins share a rank).
+  const leaders = rows.filter((r) => r.rank === 1);
+  const ended = status === "finished" || status === "aborted";
+  const leaderTitle = leaders.length > 1 ? (ended ? "Shared first place" : "Shared lead") : ended ? "Winner" : "Leader";
 
   return (
     <section className="card arena-summary" aria-label="Match summary" data-testid="arena-summary">
@@ -365,15 +411,19 @@ function Summary({ record, info, status, now }: { record: MatchRecord; info: Par
         </div>
       ) : (
         <div className="arena-leader">
-          {done > 0 && rows[0] ? (
+          {done > 0 && leaders.length > 0 ? (
             <>
-              <span className="section-title">Leader</span>
-              <div className="arena-leader-name">
-                <EngineDot color={info.colors[rows[0].participant]} />
-                <span className="truncate">{info.labels[rows[0].participant]}</span>
-                <span className="num muted">
-                  {formatPoints(rows[0].points)} / {rows[0].games}
-                </span>
+              <span className="section-title">{leaderTitle}</span>
+              <div className="arena-leader-names">
+                {leaders.map((row) => (
+                  <div key={row.participant} className="arena-leader-name">
+                    <EngineDot color={info.colors[row.participant]} />
+                    <span className="truncate">{info.labels[row.participant]}</span>
+                    <span className="num muted">
+                      {formatPoints(row.points)} / {row.games}
+                    </span>
+                  </div>
+                ))}
               </div>
             </>
           ) : (

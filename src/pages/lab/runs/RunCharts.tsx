@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { CHART_COLORS, EmptyState, LineChart } from "@/components";
 import type { TrainingRunRecord } from "@/types";
 import { formatCount } from "@/utils/format";
-import { bestPoint, buildRunChartData, withLivePoints, type ChartInputPoint } from "../model/chart";
+import { bestValidation, buildRunChartData, withLivePoints, type ChartInputPoint } from "../model/chart";
 import { formatLoss, formatLr } from "../model/format";
 import { LabIcon } from "../ui/icons";
 
@@ -13,7 +13,7 @@ const TABLE_ROWS = 300;
 export function RunCharts({ run, livePoints }: { run: TrainingRunRecord; livePoints: readonly ChartInputPoint[] }) {
   const [table, setTable] = useState(false);
   const data = useMemo(() => buildRunChartData(withLivePoints(run.points, livePoints)), [run.points, livePoints]);
-  const best = bestPoint(data.val);
+  const best = bestValidation(data.rows);
   const hasData = data.train.length > 0 || data.val.length > 0;
   // Both charts share the x range so their cycle markers line up.
   const xMin = data.rows.length ? data.rows[0].x : undefined;
@@ -70,7 +70,8 @@ export function RunCharts({ run, livePoints }: { run: TrainingRunRecord; livePoi
               {data.rows.slice(-TABLE_ROWS).reverse().map((r, i) => (
                 <tr key={`${r.x}-${i}`}>
                   <td className="num">{r.cycle + 1}</td>
-                  <td className="num">{r.epoch + 1}</td>
+                  {/* r.epoch counts completed epochs (= epochs at the very end). */}
+                  <td className="num">{Math.min(r.epoch + 1, run.config.hyper.epochs)}</td>
                   <td className="num">{formatCount(r.x)}</td>
                   <td className="num">{formatLoss(r.trainLoss)}</td>
                   <td className="num">{formatLoss(r.valLoss)}</td>

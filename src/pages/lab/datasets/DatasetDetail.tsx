@@ -78,6 +78,10 @@ function DatasetView({ dataset: d }: { dataset: DatasetRecord }) {
             <button type="button" className="btn" onClick={() => void stop()} disabled={stopping}>
               {stopping ? <span className="spinner" style={{ width: 14, height: 14 }} /> : <LabIcon name="stop" />} Stop generating
             </button>
+          ) : d.positions === 0 ? (
+            <button type="button" className="btn btn-primary" disabled title="This dataset has no positions yet">
+              <LabIcon name="spark" /> Train a network on it
+            </button>
           ) : (
             <Link to={`/lab/new?datasetIds=${encodeURIComponent(d.id)}`} className="btn btn-primary">
               <LabIcon name="spark" /> Train a network on it
@@ -107,8 +111,14 @@ function DatasetView({ dataset: d }: { dataset: DatasetRecord }) {
 
       {job && (job.status === "running" || job.status === "error") && (
         <Panel title={generating ? "Generating games" : "Generation stopped with an error"} icon={<LabIcon name="loop" />} id="lab-ds-job">
-          {job.status === "error" && <div className="callout danger small lab-notice">{job.error ?? "Something went wrong while generating."}</div>}
-          <SelfPlayProgressView p={job.progress} />
+          <div className="stack">
+            {job.status === "error" && (
+              <div className="callout danger small lab-notice" role="alert">
+                {job.error ?? "Something went wrong while generating."}
+              </div>
+            )}
+            <SelfPlayProgressView p={job.progress} live={generating} />
+          </div>
         </Panel>
       )}
       {job && job.status === "stopped" && <div className="callout small">Generation was stopped. The {formatCount(d.games)} games played so far are kept.</div>}

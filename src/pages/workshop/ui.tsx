@@ -1,6 +1,6 @@
 // Small UI helpers used across the Workshop: a dropdown menu, a media-query hook and a
 // "pick an option" dropdown button.
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Icon } from "@/components";
 
 export function useMediaQuery(query: string): boolean {
@@ -46,17 +46,48 @@ export function MenuButton({
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  // Horizontal correction that keeps the open list inside the window (a left-aligned menu near the
+  // right edge would otherwise be cut off, e.g. "Presets" in the side panel).
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!open) {
+      setShift(0);
+      return;
+    }
+    const el = listRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    const right = document.documentElement.clientWidth - margin;
+    let dx = r.right > right ? right - r.right : 0;
+    if (r.left + dx < margin) dx = margin - r.left;
+    setShift(Math.round(dx));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
+    // Escape closes the menu wherever the focus is (also before it reached the first item).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
     document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey, true);
     // Focus the first enabled item.
-    requestAnimationFrame(() => rootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus());
-    return () => document.removeEventListener("mousedown", onDoc);
+    const frame = requestAnimationFrame(() => rootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey, true);
+    };
   }, [open]);
 
   const choose = (item: MenuItem) => {
@@ -75,11 +106,6 @@ export function MenuButton({
     } else if (e.key === "Home" || e.key === "End") {
       e.preventDefault();
       list[e.key === "Home" ? 0 : list.length - 1]?.focus();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
-      buttonRef.current?.focus();
     } else if (e.key === "Tab") {
       setOpen(false);
     }
@@ -107,7 +133,14 @@ export function MenuButton({
         {label}
       </button>
       {open && (
-        <div id={menuId} role="menu" className={`workshop-menu-list workshop-menu-list--${align}`} onKeyDown={onMenuKey}>
+        <div
+          id={menuId}
+          ref={listRef}
+          role="menu"
+          className={`workshop-menu-list workshop-menu-list--${align}`}
+          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
+          onKeyDown={onMenuKey}
+        >
           {items.map((item, i) =>
             item === "separator" ? (
               <div key={`sep-${i}`} className="workshop-menu-sep" role="separator" />

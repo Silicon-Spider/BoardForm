@@ -237,6 +237,10 @@ export function NewMatchDialog({ engineIds = [], config = null, name = null, def
 
   const problems = validateMatchConfig(normalizeMatchConfig(draft), { maxConcurrency: maxWorkers });
   if (engines && s.rows.some((r) => r.engineId && !engines.has(r.engineId))) problems.unshift("An engine in this list was deleted. Choose another one.");
+  // The limits editor warns about this too ("would think forever"); don't let it through silently.
+  if (draft.participants.some((p) => !p.timeControl && !p.limits.depth && !p.limits.nodes && !p.limits.movetimeMs)) {
+    problems.push(s.same ? "Set a clock or at least one search limit." : "Give every engine a clock or at least one search limit.");
+  }
   const ids = s.rows.map((r) => r.engineId).filter((id): id is string => !!id);
   const duplicates = ids.length !== new Set(ids).size;
 

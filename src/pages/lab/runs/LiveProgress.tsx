@@ -6,7 +6,7 @@ import type { GatingProgress, LiveRunState } from "@/training";
 import type { TrainProgress } from "@/nnue/protocol";
 import type { TrainingRunRecord } from "@/types";
 import { formatCount } from "@/utils/format";
-import { formatInt, formatLoss, formatLr, formatScorePct, isActiveStatus, latestValLoss, persistedPhase, PHASE_LABELS, progressFraction, RUN_STATUS } from "../model/format";
+import { formatInt, formatLoss, formatLr, formatScorePct, isActiveStatus, persistedPhase, PHASE_LABELS, progressFraction, RUN_STATUS } from "../model/format";
 import { buildRunChartData } from "../model/chart";
 import { StatGrid } from "../ui/common";
 import { LabIcon } from "../ui/icons";
@@ -48,7 +48,12 @@ function TrainingView({ p }: { p: TrainProgress }) {
       <StatGrid
         items={[
           { label: "Training loss", value: formatLoss(p.trainLoss) },
-          { label: "Validation loss", value: formatLoss(p.valLoss), hint: p.valLoss === null ? "no validation data" : "after the last epoch" },
+          {
+            label: "Validation loss",
+            value: formatLoss(p.valLoss),
+            // Measured when training starts (the incoming network) and after every epoch.
+            hint: p.valLoss === null ? "no validation data" : p.epoch === 0 ? "before training; updated after each epoch" : "updated after each epoch",
+          },
           { label: "Positions trained on", value: formatCount(p.positionsSeen) },
           { label: "Positions / s", value: formatCount(Math.round(p.posPerSec)) },
           { label: "Learning rate", value: formatLr(p.lr) },
@@ -105,11 +110,16 @@ function PersistedProgress({ run, elsewhere }: { run: TrainingRunRecord; elsewhe
     return rows.length ? rows[rows.length - 1].x : 0;
   }, [run.points]);
   const cyclesDone = new Set(run.networkHistory.map((h) => h.cycle)).size;
+  // Results only: the trainer's measurement of the starting network (epoch 0) is not one.
   const best = useMemo(() => {
     let min: number | null = null;
-    for (const p of run.points) if (p.valLoss !== null && Number.isFinite(p.valLoss) && (min === null || p.valLoss < min)) min = p.valLoss;
-    return min ?? latestValLoss(run);
-  }, [run]);
+    const consider = (v: number | null) => {
+      if (v !== null && Number.isFinite(v) && (min === null || v < min)) min = v;
+    };
+    for (const p of run.points) if (p.epoch >= 1) consider(p.valLoss);
+    for (const h of run.networkHistory) consider(h.valLoss);
+    return min;
+  }, [run.points, run.networkHistory]);
   return (
     <div className="stack">
       <div className="lab-idle">
@@ -125,7 +135,9 @@ function PersistedProgress({ run, elsewhere }: { run: TrainingRunRecord; elsewhe
                 ? "Its last saved progress is shown below."
                 : run.status === "finished"
                   ? "Every cycle of this run is done."
-                  : RUN_STATUS[run.status].description}
+                  : run.status === "stopped" && run.networkHistory.length === 0
+                    ? "Stopped before any network was saved."
+                    : RUN_STATUS[run.status].description}
           </div>
         </div>
       </div>
@@ -137,12 +149,7 @@ function PersistedProgress({ run, elsewhere }: { run: TrainingRunRecord; elsewhe
           variant={run.status === "error" ? "danger" : run.status === "paused" ? "warn" : "accent"}
         />
       )}
-      {run.resume && run.status !== "finished" && (
-        <div className="small muted">
-          Continues {run.config.loop.enabled ? `in cycle ${run.resume.cycle + 1} ` : ""}at epoch {run.resume.epoch + 1}
-          {run.resume.step > 0 ? `, step ${formatInt(run.resume.step)}` : ""}.
-        </div>
-      )}
+      {run.resume && run.status !== "finished" && <div className="small muted">{resumeText(run.resume, run.config.loop.enabled, active)}</div>}
       {(run.networkHistory.length > 0 || totalTrained > 0) && (
         <StatGrid
           dense
@@ -158,3 +165,12 @@ function PersistedProgress({ run, elsewhere }: { run: TrainingRunRecord; elsewhe
   );
 }
 
+
+/** Where a stopped / paused run continues, or (running elsewhere) its last saved checkpoint. */
+function resumeText(r: { cycle: number; epoch: number; step: number }, loop: boolean, active: boolean): string {
+  const at = `epoch ${r.epoch + 1}${r.step > 0 ? `, step ${formatInt(r.step)}` : ""}`;
+  if (!active) return `Continues ${loop ? `in cycle ${r.cycle + 1} ` : ""}at ${at}.`;
+  // While it trains elsewhere the cursor only moves when a checkpoint is saved.
+  if (r.epoch === 0 && r.step === 0) return "No training checkpoint saved yet.";
+  return `Last saved checkpoint: ${loop ? `cycle ${r.cycle + 1}, ` : ""}${at}.`;
+}

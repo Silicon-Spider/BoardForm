@@ -147,7 +147,11 @@ export function countOf(n: number, word: string, pluralWord = word + "s"): strin
 export function formatLoss(v: number | null | undefined): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return "—";
   if (v === 0) return "0";
-  if (Math.abs(v) < 1e-4) return v.toExponential(2);
+  if (Math.abs(v) < 1e-4) {
+    // "1.23e-5", and "1e-5" rather than "1.00e-5" (chart ticks are round numbers).
+    const [mant, exp] = v.toExponential(2).split("e");
+    return `${Number(mant)}e${Number(exp)}`;
+  }
   return String(Number(v.toPrecision(4)));
 }
 

@@ -30,20 +30,22 @@ import { downloadBlob, slugify } from "@/utils/misc";
 import { AreaBoundary } from "./AreaBoundary";
 import { BlocksMain } from "./BlocksMain";
 import { BuildLog } from "./BuildLog";
-import { errorsOf, recordFailedBuild, runBuild, useEngineBuild, type EngineBuildState } from "./build-store";
+import { recordFailedBuild, runBuild, useEngineBuild } from "./build-store";
 import type { CodePaneHandle } from "./CodePane";
 import { EngineDraft } from "./draft";
 import { EvalMain, templateEvalFor } from "./EvalMain";
 import { FilesMain } from "./FilesMain";
-import { WorkshopHeader, type BuildPillInfo } from "./Header";
-import { blocksToCodeRecord, conversionFor, convertedEvalSource, duplicateRecord, filePatch, unlockFullRecord } from "./records";
+import { WorkshopHeader } from "./Header";
+import { blocksToCodeRecord, conversionFor, convertedEvalSource, duplicateRecord, entryOf, filePatch, unlockFullRecord } from "./records";
 import { EngineSession } from "./session";
 import { SettingsPanel } from "./SettingsPanel";
+import { buildPillFor, errorsOf, type SourceHash } from "./status";
 import { EngineSource, GeneratedCode } from "./SourcePanels";
 import { TestBench } from "./bench/TestBench";
 import type { RevealTarget, SideTabId, TabId } from "./types";
 import { IS_MAC, type MenuItem, useMediaQuery } from "./ui";
 import { WasmMain } from "./WasmMain";
+import { clearBackup, editsToRestore, readBackup, writeBackup } from "./unsaved";
 
 const SIDE_TABS: Record<EngineKind, SideTabId[]> = {
   blocks: ["test", "code", "build", "settings"],
@@ -73,6 +75,14 @@ const NARROW_QUERY = "(max-width: 900px)";
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+/**
+ * The block editor hands over an edit ~300 ms after it happened (its debounce, see @/blocks), and
+ * offers no way to deliver it sooner. Saving or building a blocks engine waits that long first, so
+ * Ctrl+S / Ctrl+B / Build pressed right after editing a block include that edit.
+ */
+const BLOCKS_SETTLE_MS = 360;
+const settleBlocks = (kind: EngineKind): Promise<void> => (kind === "blocks" ? new Promise((resolve) => setTimeout(resolve, BLOCKS_SETTLE_MS)) : Promise.resolve());
+
 // ---------------------------------------------------------------------------------------------
 // Hooks
 
@@ -88,53 +98,113 @@ function useDraft(stored: EngineRecord): EngineDraft {
   useEffect(() => {
     draft.receive(stored);
   }, [draft, stored]);
+  // While the page is going away, every change of the unsaved edits is also copied to
+  // localStorage (synchronous, so it survives the unload); the copy goes once all is stored.
+  const closing = useRef(false);
+  const backedUp = useRef(false);
+  // Edits that a reload or a closed tab interrupted before they reached IndexedDB (see unsaved.ts):
+  // apply them again, once, when the engine opens (the copy goes once they are saved).
+  const initial = useRef(stored);
+  useEffect(() => {
+    const backup = readBackup(initial.current.id);
+    const edits = editsToRestore(backup, initial.current);
+    if (edits) {
+      backedUp.current = true;
+      draft.edit(edits);
+    } else if (backup) clearBackup(initial.current.id);
+  }, [draft]);
+  const backUp = useCallback(() => {
+    const edits = draft.unsaved();
+    if (edits && writeBackup(draft.id, edits, Date.now())) backedUp.current = true;
+  }, [draft]);
+  // A failed save is shown in the header; the first time a message appears it is also toasted so
+  // it cannot go unnoticed. (A deleted engine is reported by the page itself.)
+  useEffect(() => {
+    let lastError: string | null = null;
+    return draft.subscribe(() => {
+      const s = draft.getSnapshot();
+      if (s.error && s.error !== lastError && !s.gone) toast("Your changes could not be saved", { kind: "error", detail: `${s.error.replace(/\.?\s*$/, ".")} Your edits are kept and saved with your next change (or press Retry).` });
+      lastError = s.error;
+      if (closing.current) backUp();
+      if (backedUp.current && (s.state === "saved" || s.gone)) {
+        clearBackup(draft.id);
+        backedUp.current = false;
+      }
+    });
+  }, [draft, backUp]);
   useEffect(() => {
     draft.open();
-    const flush = () => void draft.flush();
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") flush();
+    // Leaving / hiding the page: save now and save later edits at once instead of debounced (the
+    // blocks editor delivers its last debounced change from its own listeners, which run after
+    // these), with a localStorage copy of whatever is not stored yet. Back on screen: debounced again.
+    const hide = () => {
+      closing.current = true;
+      draft.close();
+      backUp();
+    };
+    const show = () => {
+      closing.current = false;
+      draft.open();
+    };
+    const onVisibility = () => (document.visibilityState === "hidden" ? hide() : show());
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) show();
     };
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      flush();
+      // Save now, and save at once what arrives next: the blocks editor hands over its pending
+      // change from its own beforeunload listener, which runs after this one. Writes started here
+      // usually finish while the browser loads the next page (at pagehide it would be too late);
+      // the localStorage copy covers the ones it cuts off.
+      hide();
       // Only a failed save would lose work; routine autosaves finish on their own.
       if (draft.getSnapshot().state === "error" && !draft.getSnapshot().gone) e.preventDefault();
+      // The page may stay (the user cancelled leaving): back to debounced saving after a moment.
+      setTimeout(() => {
+        if (document.visibilityState === "visible") show();
+      }, 2000);
     };
-    window.addEventListener("pagehide", flush);
+    window.addEventListener("pagehide", hide);
+    window.addEventListener("pageshow", onPageShow);
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pagehide", hide);
+      window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibility);
+      // Leaving the Workshop inside the app: the page stays alive, so the write finishes.
+      closing.current = false;
       draft.close();
     };
-  }, [draft]);
+  }, [draft, backUp]);
   return draft;
 }
 
-interface SourceHash {
-  hash: string | null;
-  /** The sources cannot be assembled (e.g. missing entry file). */
-  problem: string | null;
-}
-
-/** Hash of the engine's current sources (debounced), to tell whether the saved build is current. */
-function useSourceHash(view: EngineRecord): SourceHash {
-  const [state, setState] = useState<SourceHash>({ hash: null, problem: null });
+/**
+ * Hash of the engine's current sources (debounced while typing), to tell whether the saved build
+ * is current. When a build finishes (`buildSeq` changes) it is worked out at once: otherwise a
+ * build started right after an edit could finish before the debounced hash catches up, and the
+ * header would briefly call the failed build "Up to date" ("you changed the code since").
+ */
+function useSourceHash(view: EngineRecord, buildSeq: number): SourceHash {
+  const [state, setState] = useState<SourceHash>({ hash: null, problem: null, seq: buildSeq });
   const first = useRef(true);
+  const lastSeq = useRef(buildSeq);
   const { kind, files, blocks, entry, generatorVersion } = view;
   useEffect(() => {
     if (kind === "wasm") return;
     let cancelled = false;
-    const delay = first.current ? 0 : 250;
+    const afterBuild = lastSeq.current !== buildSeq;
+    lastSeq.current = buildSeq;
+    const delay = first.current || afterBuild ? 0 : 250;
     first.current = false;
     const timer = setTimeout(() => {
       void (async () => {
         try {
           const hash = await sourceHashOf(assembleSources({ ...view, kind, files, blocks, entry, generatorVersion }));
-          if (!cancelled) setState({ hash, problem: null });
+          if (!cancelled) setState({ hash, problem: null, seq: buildSeq });
         } catch (err) {
-          if (!cancelled) setState({ hash: null, problem: messageOf(err) });
+          if (!cancelled) setState({ hash: null, problem: messageOf(err), seq: buildSeq });
         }
       })();
     }, delay);
@@ -143,25 +213,9 @@ function useSourceHash(view: EngineRecord): SourceHash {
       clearTimeout(timer);
     };
     // `view` itself changes on every edit; only the fields that go into the build matter.
-  }, [kind, files, blocks, entry, generatorVersion]);
-  return state;
-}
-
-function buildPillFor(view: EngineRecord, build: EngineBuildState, source: SourceHash): BuildPillInfo | null {
-  if (view.kind === "wasm") return { tone: "neutral", text: view.wasm?.byteLength ? `Module · ${formatBytes(view.wasm.byteLength)}` : "No module" };
-  if (build.running > 0) return { tone: "accent", text: build.statusText ?? "Building…", spinner: true };
-  if (source.problem) return { tone: "danger", text: "Can't build", title: source.problem };
-  const last = build.last;
-  if (last && !last.ok && (last.sourceHash === null || last.sourceHash === source.hash)) {
-    const n = errorsOf(last.result).length;
-    const first = errorsOf(last.result)[0];
-    return { tone: "danger", text: n ? `${n} error${n === 1 ? "" : "s"}` : "Build failed", title: last.problem ?? first?.message ?? "Open the build log" };
-  }
-  if (!source.hash) return { tone: "neutral", text: "Checking…" };
-  if (view.build && view.build.sourceHash === source.hash) {
-    return { tone: "ok", text: `Up to date · ${formatBytes(view.build.sizeBytes)}`, title: `Built ${new Date(view.build.builtAt).toLocaleString()} with ${view.build.compiler}` };
-  }
-  return { tone: "warn", text: view.build ? "Needs build" : "Not built yet", title: "The code changed since the last build" };
+  }, [kind, files, blocks, entry, generatorVersion, buildSeq]);
+  // Worked out before the latest build finished: unknown until it is recomputed (a moment).
+  return state.seq === buildSeq ? state : { hash: null, problem: null, seq: buildSeq };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -172,7 +226,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   const view = snap.view;
   const kind = view.kind;
   const build = useEngineBuild(view.id);
-  const source = useSourceHash(view);
+  const source = useSourceHash(view, build.last?.seq ?? 0);
   const confirm = useConfirm();
   const narrow = useMediaQuery(NARROW_QUERY);
   const editorRef = useRef<CodePaneHandle>(null);
@@ -194,9 +248,13 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
         label: () => draft.view.name,
         prepare: async (onStatus) => {
           onStatus("Saving your changes…");
+          await settleBlocks(draft.view.kind);
           if (!(await draft.flush())) throw new Error(`Your latest changes could not be saved: ${draft.getSnapshot().error ?? "unknown error"}`);
           const current = draft.view;
-          if (current.kind === "wasm") return;
+          if (current.kind === "wasm") {
+            if (!current.wasm || current.wasm.byteLength === 0) throw new Error("There is no module yet: choose a .wasm file first.");
+            return;
+          }
           const { run } = await runBuild(current, { onStatus });
           if (!run.ok) {
             if (run.result) throw new BuildError(run.result, `"${current.name}"`);
@@ -234,6 +292,16 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   const visited = useRef(new Set<SideTabId>());
   visited.current.add(activeSide);
 
+  // On narrow screens the tab strip scrolls sideways: keep the active tab visible (e.g. "Build log"
+  // opened by a failed build).
+  useEffect(() => {
+    if (!narrow) return;
+    const frame = requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>(".workshop-stack-tabs .tab.active")?.scrollIntoView({ block: "nearest", inline: "nearest" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [narrow, active]);
+
   const setTab = useCallback((id: TabId) => setQuery({ tab: id }), []);
   const showBuildLog = useCallback(() => setQuery({ tab: "build" }), []);
 
@@ -241,9 +309,17 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   const diagnostics = useMemo(() => build.last?.result?.diagnostics ?? [], [build.last]);
 
   const failureToast = useRef<number | null>(null);
+  // A build failure toast is about this engine: it goes when the Workshop closes (or switches to
+  // another engine) instead of lingering over the next page. The build log keeps the details.
+  useEffect(
+    () => () => {
+      if (failureToast.current !== null) dismissToast(failureToast.current);
+    },
+    [],
+  );
   const doBuild = useCallback(async () => {
-    const current = draft.view;
-    if (current.kind === "wasm") return;
+    if (draft.view.kind === "wasm") return;
+    await settleBlocks(draft.view.kind);
     if (!(await draft.flush())) {
       toast("Your changes could not be saved, so the engine was not built", { kind: "error", detail: draft.getSnapshot().error ?? undefined });
       return;
@@ -253,7 +329,14 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
       dismissToast(failureToast.current);
       failureToast.current = null;
     }
-    if (run.ok) {
+    if (run.ok && run.missingExports?.length) {
+      session.restart("new build");
+      failureToast.current = toast("Built, but it is not a working engine yet", {
+        kind: "warn",
+        detail: `The module does not export ${run.missingExports.join(", ")}. Check that the entry file (${entryOf(draft.view)}) exports the ABI functions.`,
+      });
+      setTab("build");
+    } else if (run.ok) {
       session.restart("new build");
       const warnings = run.result ? run.result.diagnostics.filter((d) => d.severity === "warning").length : 0;
       toast(`Build succeeded${run.sizeBytes ? ` · ${formatBytes(run.sizeBytes)}` : ""}`, {
@@ -316,6 +399,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
 
   const createDerived = async (make: (names: string[]) => EngineRecord, done: (r: EngineRecord) => string) => {
     try {
+      await settleBlocks(draft.view.kind);
       if (!(await draft.flush())) throw new Error(draft.getSnapshot().error ?? "Your changes could not be saved.");
       const record = make(await existingNames());
       await enginesRepo.put(record);
@@ -339,6 +423,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
 
   const exportFile = async () => {
     try {
+      await settleBlocks(draft.view.kind);
       if (!(await draft.flush())) throw new Error(draft.getSnapshot().error ?? "Your changes could not be saved.");
       const blob = await exportEngineFile(view.id);
       downloadBlob(blob, `${slugify(draft.view.name)}.engine.json`);
@@ -398,7 +483,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
       const key = e.key.toLowerCase();
       if (key === "s") {
         e.preventDefault();
-        void draft.flush();
+        void settleBlocks(draft.view.kind).then(() => draft.flush());
       } else if (key === "b") {
         e.preventDefault();
         if (draft.view.kind !== "wasm") void buildRef.current();

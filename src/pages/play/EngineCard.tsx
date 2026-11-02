@@ -8,7 +8,7 @@ import { infoWhiteScore, pvTokens, scoreForSide, scoreText } from "./format";
 import { PlayIcon } from "./icons";
 import type { Side } from "./types";
 
-export type EngineCardStatus = "off" | "loading" | "waiting" | "thinking" | "analysing" | "stopped" | "finished" | "error";
+export type EngineCardStatus = "off" | "loading" | "waiting" | "thinking" | "analysing" | "paused" | "stopped" | "finished" | "error";
 
 export interface EngineCardProps {
   name: string;
@@ -38,6 +38,7 @@ const STATUS_LABEL: Record<EngineCardStatus, string> = {
   waiting: "Waiting",
   thinking: "Thinking",
   analysing: "Analysing",
+  paused: "Paused",
   stopped: "Stopped",
   finished: "Finished",
   error: "Error",

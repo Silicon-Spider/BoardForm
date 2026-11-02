@@ -134,6 +134,12 @@ describe("validateConfig / estimate", () => {
       runConfig({ data: { datasetIds: ["ds"], selfPlay: null }, loop: { enabled: true, cycles: 3, selfPlayWithLatest: true, keepCycles: null, gating: null } }),
     );
     expect(loopNoSp.join(" ")).toMatch(/loop needs self-play/);
+
+    // Malformed ids (a stale form) are reported as missing, not thrown by IndexedDB.
+    const malformed = await lab.training.validateConfig(runConfig({ data: { datasetIds: [undefined as unknown as string, ""], selfPlay: null } }));
+    expect(malformed.join(" ")).toMatch(/2 of the selected datasets no longer exist/);
+    const est = await lab.training.estimate(runConfig({ data: { datasetIds: [undefined as unknown as string], selfPlay: null } }));
+    expect(est.positions).toBe(0);
   });
 
   it("estimates positions, steps and parameters with the guidance warnings", async () => {
@@ -160,6 +166,19 @@ describe("validateConfig / estimate", () => {
     expect(small.warnings.length).toBe(2);
     expect(small.warnings[0]).toMatch(/optimizer steps per cycle/);
     expect(small.warnings[1]).toMatch(/few hundred thousand positions/);
+
+    // The advice quotes only sensible numbers: none for a tiny dataset, concrete ones otherwise.
+    await datasetsRepo.put(makeDataset("tiny", { positions: 1900 }));
+    const tiny = await lab.training.estimate(
+      runConfig({ data: { datasetIds: ["tiny"], selfPlay: null }, hyper: { ...runConfig().hyper, batchSize: 1024, epochs: 12, validationSplit: 0.05 } }),
+    );
+    expect(tiny.warnings[0]).toMatch(/Add more positions/);
+    expect(tiny.warnings[0]).not.toMatch(/batch size \(about|about [\d,]+ epochs/);
+    await datasetsRepo.put(makeDataset("medium", { positions: 100_000 }));
+    const medium = await lab.training.estimate(
+      runConfig({ data: { datasetIds: ["medium"], selfPlay: null }, hyper: { ...runConfig().hyper, batchSize: 4096, epochs: 10, validationSplit: 0.05 } }),
+    );
+    expect(medium.warnings[0]).toMatch(/Use a smaller batch size \(about 950\) or about 42 epochs\./);
 
     const empty = await lab.training.estimate(runConfig());
     expect(empty).toMatchObject({ positions: 0, stepsPerEpoch: 0, totalSteps: 0 });

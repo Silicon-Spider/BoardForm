@@ -23,10 +23,12 @@ import {
   fileBaseName,
   isHexColor,
   pickDefaultColor,
+  redundantRestoredStarters,
   suggestName,
   uniqueName,
   type NewEngineDetails,
 } from "./records";
+import { engineFileName, restoredStartersMessage } from "./actions";
 import { capabilitiesFromInspection } from "./wasm-check";
 
 const CTX = { id: "new-id", now: 1_700_000_000_000, hashMb: 32 };
@@ -66,6 +68,14 @@ describe("uniqueName / copyName", () => {
     expect(copyName("Blocky", ["Blocky", "Blocky (copy)"])).toBe("Blocky (copy 2)");
     expect(copyName("Blocky (copy)", ["Blocky", "Blocky (copy)"])).toBe("Blocky (copy 2)");
     expect(copyName("Blocky (copy 2)", ["Blocky (copy)", "Blocky (copy 2)", "blocky (COPY 3)"])).toBe("Blocky (copy 4)");
+  });
+
+  it("keeps suffixed names within the 80-character limit", () => {
+    const long = "x".repeat(80);
+    expect(copyName(long, [])).toBe(`${"x".repeat(73)} (copy)`);
+    expect(copyName(long, [`${"x".repeat(73)} (copy)`])).toBe(`${"x".repeat(71)} (copy 2)`);
+    expect(uniqueName(long, [long])).toBe(`${"x".repeat(78)} 2`);
+    for (const n of [copyName(long, []), uniqueName(long, [long])]) expect(n.length).toBeLessThanOrEqual(80);
   });
 });
 
@@ -231,6 +241,44 @@ describe("duplicateEngineRecord", () => {
     expect(copy.build!.wasm).not.toBe(source.build!.wasm);
     copy.files!["eval.ts"] = "changed";
     expect(source.files!["eval.ts"]).toBe("code");
+  });
+});
+
+describe("restoring the starter engines", () => {
+  const starter = (id: string, name: string, overrides: Partial<EngineRecord> = {}) =>
+    engine(id, { name, builtin: true, tags: ["starter"], files: { "eval.ts": `// ${name}` }, ...overrides });
+
+  it("drops fresh copies of starters that are still there unchanged, keeps the others", () => {
+    const existing = [
+      starter("old-blocky", "Blocky", { kind: "blocks", blocks: { a: [1, 2], b: "x" }, files: { "eval.ts": "// gen" } }),
+      // Edited: its sources differ from the fresh copy.
+      starter("old-classic", "Classic", { files: { "eval.ts": "// my own eval" }, updatedAt: 5000 }),
+      // Renamed by the user: not a twin (different name).
+      starter("renamed", "My Sprout", { kind: "scratch", files: { "main.ts": "// Sprout" } }),
+      // A user engine with a starter's name is not a starter.
+      engine("mine", { name: "Sprout", kind: "scratch", files: { "main.ts": "// Sprout" } }),
+    ];
+    const fresh = [
+      // Same content even though the stored object went through a different path (key order).
+      starter("new-blocky", "blocky ", { kind: "blocks", blocks: { b: "x", a: [1, 2] }, files: { "eval.ts": "// gen" }, createdAt: 9000, updatedAt: 9000 }),
+      starter("new-classic", "Classic", { createdAt: 9000, updatedAt: 9000 }),
+      starter("new-sprout", "Sprout", { kind: "scratch", files: { "main.ts": "// Sprout" }, createdAt: 9000, updatedAt: 9000 }),
+    ];
+    expect(redundantRestoredStarters(existing, fresh)).toEqual(["new-blocky"]);
+    // A built starter whose sources are unchanged still counts as a twin (the build does not matter).
+    const built = starter("built-classic", "Classic", { build: { sourceHash: "h", wasm: new ArrayBuffer(1), builtAt: 1, compiler: "asc", sizeBytes: 1, compileMs: 1, warnings: 0 }, updatedAt: 7000 });
+    expect(redundantRestoredStarters([built], fresh)).toEqual(["new-classic"]);
+    expect(redundantRestoredStarters([], fresh)).toEqual([]);
+  });
+
+  it("says what came back, or that nothing was missing", () => {
+    expect(restoredStartersMessage([])).toMatchObject({ message: "Your starter engines are all here" });
+    expect(restoredStartersMessage(["Sprout"]).detail).toBe("Sprout is back in your library.");
+    expect(restoredStartersMessage(["Blocky", "Classic", "Sprout"]).detail).toBe("Blocky, Classic and Sprout are back in your library.");
+  });
+
+  it("names exported engine files like the Workshop does", () => {
+    expect(engineFileName("Classic (copy)")).toMatch(/^classic-copy\.engine\.json$/);
   });
 });
 

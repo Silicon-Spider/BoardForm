@@ -37,7 +37,7 @@ When the app wants a move it calls `cb_position(...)` with the game so far and t
 
 1. **Limits.** `setupLimits` turns the depth, node, move-time and clock arguments into a node limit, a *soft* time limit (don't start another iteration) and a *hard* time limit (stop now).
 2. **A move in hand.** The root moves are generated. If there are none the engine returns "no move" (checkmate or stalemate). Otherwise the first legal move — or the best move from an earlier search of this position — is kept as a fallback, so a legal move is returned even if the search is stopped at once.
-3. **Iterative deepening.** The engine searches to depth 1, 2, 3 … Each finished iteration is reported to the app with `cb_info` (depth, score, nodes, time and the principal variation). The loop ends at the depth limit, when the soft time limit has passed, when the search is stopped, or when a forced mate has been found that deeper searches can't improve.
+3. **Iterative deepening.** The engine searches to depth 1, 2, 3 … Each finished iteration is reported to the app with `cb_info` (depth, score, nodes, time and the principal variation). The loop ends at the depth limit, when the soft time limit has passed, when the search is stopped, or — in a timed search — when a forced mate has been found that deeper searches can't improve.
 4. **The answer.** The best move is written to the output buffer.
 
 If time runs out halfway through an iteration, the engine keeps the best move found so far: the previous iteration's best move is searched first and only a move that proves better replaces it.
@@ -76,7 +76,7 @@ Alpha-beta prunes the most when the best move comes first. Moves are tried in th
 
 ### Pruning and reductions
 
-These skip or shorten parts of the tree that are very unlikely to matter. The pruning techniques are never used in principal-variation nodes or when in check, and a move that gives check is never pruned.
+These skip or shorten parts of the tree that are very unlikely to matter. Reverse futility, null-move, late move, futility and SEE pruning are never used in principal-variation nodes or when in check, and a move that gives check is never pruned or reduced.
 
 | Technique | When | Idea |
 | --- | --- | --- |

@@ -66,7 +66,10 @@ export interface PoolHandlers<G> {
   /** One board per worker; called whenever one changes (throttle in the caller). */
   onBoards?(boards: LiveBoard[]): void;
   onLog?(level: "info" | "warn", message: string): void;
-  /** All workers started (engines instantiated). */
+  /**
+   * Workers whose engine is running so far: called as each one becomes ready (the last call
+   * counts all of them), so the live "Workers" figure never says 0 while games are being played.
+   */
   onReady?(workers: number): void;
 }
 
@@ -222,7 +225,7 @@ function runPool(
         case "ready":
           slot.ready = true;
           readyCount++;
-          if (readyCount === slots.length) handlers.onReady?.(slots.length);
+          handlers.onReady?.(readyCount);
           assign(slot);
           return;
         case "init-error":

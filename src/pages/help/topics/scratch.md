@@ -148,16 +148,25 @@ Uncomment the optional exports in the skeleton when you have what they need: `cb
 - **Run perft** counts from the position on the board, to the depth you choose, and shows the reference count when the position is a known one.
 - **Check move generation** runs perft 1, 2, 3 … up to the depth you choose on six reference positions and marks every count that doesn't match.
 
-The reference positions and their counts:
+The reference positions and their counts at depths 1 to 5:
 
-| Position | FEN | Depth 1 · 2 · 3 · 4 · 5 |
-| --- | --- | --- |
-| Start position | `startpos` | 20 · 400 · 8 902 · 197 281 · 4 865 609 |
-| "Kiwipete" | `r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1` | 48 · 2 039 · 97 862 · 4 085 603 · 193 690 690 |
-| Position 3 | `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1` | 14 · 191 · 2 812 · 43 238 · 674 624 |
-| Position 4 | `r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1` | 6 · 264 · 9 467 · 422 333 · 15 833 292 |
-| Position 5 | `rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8` | 44 · 1 486 · 62 379 · 2 103 487 · 89 941 194 |
-| Position 6 | `r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10` | 46 · 2 079 · 89 890 · 3 894 594 · 164 075 551 |
+| Position | Depth 1 | Depth 2 | Depth 3 | Depth 4 | Depth 5 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Start position | 20 | 400 | 8 902 | 197 281 | 4 865 609 |
+| Kiwipete | 48 | 2 039 | 97 862 | 4 085 603 | 193 690 690 |
+| Position 3 | 14 | 191 | 2 812 | 43 238 | 674 624 |
+| Position 4 | 6 | 264 | 9 467 | 422 333 | 15 833 292 |
+| Position 5 | 44 | 1 486 | 62 379 | 2 103 487 | 89 941 194 |
+| Position 6 | 46 | 2 079 | 89 890 | 3 894 594 | 164 075 551 |
+
+Their FENs, to paste into the Test panel's position box:
+
+- **Start position:** `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`
+- **Kiwipete:** `r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1`
+- **Position 3:** `8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1`
+- **Position 4:** `r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1`
+- **Position 5:** `rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8`
+- **Position 6:** `r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10`
 
 Kiwipete is full of castling, en passant and promotion traps; position 3 catches en-passant captures that would expose the king; positions 4 and 5 test promotions and castling rights.
 

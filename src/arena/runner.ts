@@ -53,9 +53,12 @@ const STOP_GRACE_MS = 3_000;
  * While running, the record is touched this often. initArenaService() adds (updatedAt −
  * runningSince) to the running time of a match whose tab closed, so long games are not lost.
  */
-const HEARTBEAT_MS = 30_000;
+const HEARTBEAT_MS = 10_000;
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+/** The engine worker's note that it merged info reports (src/engine-host/engine.worker.ts). */
+const REPEATING_HOST_NOTE = /^\[host\] the engine sent info very often/;
 
 /** An engine failed to build or start; remembers which one, so the UI can link to it. */
 class EngineFailure extends Error {
@@ -161,6 +164,8 @@ export class MatchRunner {
   // Live state batching.
   private views: Array<LiveGameView | null> = [];
   private pendingLog: ArenaLogEntry[] = [];
+  /** Engines whose repeating host note (REPEATING_HOST_NOTE) was logged already. */
+  private notedEngines = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
@@ -286,7 +291,7 @@ export class MatchRunner {
       this.deps,
       this.controller.signal,
       (id) => this.engineNames.get(id) ?? "engine",
-      (name, line) => this.log(line.startsWith("[host]") ? "warn" : "info", `${name}: ${line}`),
+      (name, line) => this.engineLog(name, line),
     );
     this.pools.push(pool);
     try {
@@ -501,6 +506,21 @@ export class MatchRunner {
   private setView(slot: number, view: LiveGameView | null): void {
     if (slot < this.views.length) this.views[slot] = view;
     this.scheduleFlush();
+  }
+
+  /**
+   * A log line from an engine's worker. The host's note that it merged info reports comes after
+   * almost every fast search (iterations finish within microseconds at small node counts), so it
+   * is shown once per engine and session instead of flooding the log.
+   */
+  private engineLog(name: string, line: string): void {
+    if (REPEATING_HOST_NOTE.test(line)) {
+      if (this.notedEngines.has(name)) return;
+      this.notedEngines.add(name);
+      this.log("info", `${name}: ${line} (shown once)`);
+      return;
+    }
+    this.log(line.startsWith("[host]") ? "warn" : "info", `${name}: ${line}`);
   }
 
   private log(level: ArenaLogEntry["level"], text: string): void {

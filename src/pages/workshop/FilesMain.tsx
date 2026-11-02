@@ -1,6 +1,6 @@
 // Main area of full / scratch engines: the file tree (create, rename, delete, set entry), open
 // file tabs and the code editor with per-file diagnostics.
-import { useEffect, useMemo, useState, type Ref } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { EmptyState, Icon, Modal, type ConfirmFn } from "@/components";
 import { FileTree, diagnosticsForFile, normalizeFilePath, validateFilePath } from "@/components/code";
 import { TEMPLATE_VERSION, templateFiles } from "@/engine-host";
@@ -46,6 +46,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
   const [tabs, setTabs] = useState<string[]>(() => (active ? [active] : []));
   const [dialog, setDialog] = useState<Dialog>(null);
   const [treeOpen, setTreeOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   // Keep the tabs in line with the files and the active file.
   useEffect(() => {
@@ -158,8 +159,21 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
     );
   }
 
+  // Narrow screens: the tree is a drawer over the editor. Escape (not taken by the tree itself,
+  // e.g. by its menu or a name field) or a press on the editor closes it.
+  const closeDrawer = (focusToggle: boolean) => {
+    setTreeOpen(false);
+    if (focusToggle) toggleRef.current?.focus();
+  };
+
   const tree = (
-    <div className={"workshop-tree" + (narrow ? " workshop-tree--drawer" : "")} hidden={narrow && !treeOpen}>
+    <div
+      className={"workshop-tree" + (narrow ? " workshop-tree--drawer" : "")}
+      hidden={narrow && !treeOpen}
+      onKeyDown={(e) => {
+        if (narrow && e.key === "Escape" && !e.defaultPrevented) closeDrawer(true);
+      }}
+    >
       <FileTree
         className="workshop-tree-list"
         files={paths}
@@ -185,40 +199,52 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
   return (
     <div className="workshop-files">
       {tree}
-      <div className="workshop-files-editor">
-        <div className="workshop-filetabs" role="tablist" aria-label="Open files">
+      <div
+        className="workshop-files-editor"
+        onPointerDown={(e) => {
+          if (narrow && treeOpen && !(e.target as Element).closest(".workshop-tree-toggle")) closeDrawer(false);
+        }}
+      >
+        <div className="workshop-filetabs">
           {narrow && (
-            <button type="button" className="btn btn-sm btn-ghost workshop-tree-toggle" onClick={() => setTreeOpen((o) => !o)} aria-expanded={treeOpen}>
+            <button
+              ref={toggleRef}
+              type="button"
+              className="btn btn-sm btn-ghost workshop-tree-toggle"
+              onClick={() => setTreeOpen((o) => !o)}
+              aria-expanded={treeOpen}
+            >
               <Icon name="copy" size={14} /> Files
             </button>
           )}
-          {tabs.map((t) => {
-            const name = t.split("/").pop() ?? t;
-            const errs = errorCounts[t] ?? 0;
-            return (
-              <div key={t} className={"workshop-filetab" + (t === active ? " active" : "")} title={t}>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={t === active}
-                  className="workshop-filetab-name"
-                  onClick={() => onOpenFile(t)}
-                  onAuxClick={(e) => {
-                    if (e.button === 1) closeEditorTab(t);
-                  }}
-                >
-                  {name}
-                  {t === entry && <span className="workshop-entry-mark" title="Entry file">entry</span>}
-                  {dirty.has(t) && <span className="workshop-dirty-dot" aria-label="unsaved" />}
-                  {errs > 0 && <span className="badge badge-danger">{errs}</span>}
-                </button>
-                <button type="button" className="workshop-filetab-close" aria-label={`Close ${name}`} onClick={() => closeEditorTab(t)}>
-                  <Icon name="close" size={12} />
-                </button>
-              </div>
-            );
-          })}
-          <span className="spacer" />
+          <div className="workshop-filetabs-scroll" role="tablist" aria-label="Open files">
+            {tabs.map((t) => {
+              const name = t.split("/").pop() ?? t;
+              const errs = errorCounts[t] ?? 0;
+              return (
+                <div key={t} className={"workshop-filetab" + (t === active ? " active" : "")} title={t}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={t === active}
+                    className="workshop-filetab-name"
+                    onClick={() => onOpenFile(t)}
+                    onAuxClick={(e) => {
+                      if (e.button === 1) closeEditorTab(t);
+                    }}
+                  >
+                    {name}
+                    {t === entry && <span className="workshop-entry-mark" title="Entry file">entry</span>}
+                    {dirty.has(t) && <span className="workshop-dirty-dot" aria-label="unsaved" />}
+                    {errs > 0 && <span className="badge badge-danger">{errs}</span>}
+                  </button>
+                  <button type="button" className="workshop-filetab-close" aria-label={`Close ${name}`} onClick={() => closeEditorTab(t)}>
+                    <Icon name="close" size={12} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
           {active && (
             <MenuButton
               label={
@@ -282,10 +308,17 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
 function PathDialog({ dialog, onClose, onSubmit }: { dialog: Dialog; onClose(): void; onSubmit(value: string): string | null }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
+  // Reset the field while rendering (not in an effect) when another dialog opens, so its first
+  // frame already shows the right name.
+  const [shownFor, setShownFor] = useState<Dialog>(null);
+  // The dialog whose name was pre-selected: only the first focus selects the base name (focusing
+  // the field again later, e.g. after a validation error, must not throw away a corrected name).
+  const selectedFor = useRef<Dialog>(null);
+  if (dialog !== shownFor) {
+    setShownFor(dialog);
     setValue(dialog?.kind === "rename" ? dialog.path : "");
     setError(null);
-  }, [dialog]);
+  }
   const submit = () => {
     const problem = onSubmit(value);
     if (problem) setError(problem);
@@ -324,6 +357,15 @@ function PathDialog({ dialog, onClose, onSubmit }: { dialog: Dialog; onClose(): 
           placeholder="pawns.ts or lib/pawns.ts"
           spellCheck={false}
           autoComplete="off"
+          onFocus={(e) => {
+            // Renaming: select the name without folder and extension, so typing replaces just that.
+            if (dialog?.kind !== "rename" || selectedFor.current === dialog) return;
+            selectedFor.current = dialog;
+            const el = e.currentTarget;
+            const start = el.value.lastIndexOf("/") + 1;
+            const dot = el.value.lastIndexOf(".");
+            el.setSelectionRange(start, dot > start ? dot : el.value.length);
+          }}
           onChange={(e) => {
             setValue(e.target.value);
             setError(null);

@@ -64,6 +64,7 @@ export function WasmMain({ view, draft, session }: { view: EngineRecord; draft: 
 
   const exportSet = useMemo(() => new Set(inspection?.exports ?? []), [inspection]);
   const nnueCapable = exportSet.has("cb_nnue_alloc") && exportSet.has("cb_nnue_load");
+  const hasModule = !!view.wasm && view.wasm.byteLength > 0;
 
   const replace = async () => {
     const file = await pickFile(".wasm,application/wasm");
@@ -79,7 +80,7 @@ export function WasmMain({ view, draft, session }: { view: EngineRecord; draft: 
       draft.edit({ wasm: bytes });
       if (!(await draft.flush())) return;
       session.restart("the module was replaced");
-      toast(`Module replaced (${formatBytes(bytes.byteLength)})`, { kind: "success", detail: info.warnings.length ? `${info.warnings.length} warning(s) — see the inspection.` : undefined });
+      toast(`${hasModule ? "Module replaced" : "Module added"} (${formatBytes(bytes.byteLength)})`, { kind: "success", detail: info.warnings.length ? `${info.warnings.length} warning(s) — see the inspection.` : undefined });
     } catch (err) {
       toast("Could not read the file", { kind: "error", detail: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -90,7 +91,7 @@ export function WasmMain({ view, draft, session }: { view: EngineRecord; draft: 
   const actions = (
     <div className="row-wrap">
       <button type="button" className="btn btn-primary" onClick={() => void replace()} disabled={replacing}>
-        {replacing ? <span className="spinner workshop-btn-spinner" /> : <Icon name="reset" size={14} />} Replace module…
+        {replacing ? <span className="spinner workshop-btn-spinner" /> : <Icon name={hasModule ? "reset" : "plus"} size={14} />} {hasModule ? "Replace module…" : "Choose a .wasm file…"}
       </button>
       {view.wasm && view.wasm.byteLength > 0 && (
         <button type="button" className="btn" onClick={() => downloadBlob(new Blob([view.wasm!], { type: "application/wasm" }), `${slugify(view.name)}.wasm`)}>

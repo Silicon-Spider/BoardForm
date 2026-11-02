@@ -232,7 +232,11 @@ export interface SelfPlayWorkerDeps {
   now?(): number;
 }
 
-/** Engine output lines forwarded per worker before the rest is suppressed (some engines log every move). */
+/**
+ * Engine output lines forwarded before the rest is suppressed (some engines log every move). Only
+ * the first worker forwards: every worker runs the same engine(s), so the others would repeat the
+ * same lines once per worker in the run log.
+ */
 const MAX_FORWARDED_LOGS = 3;
 
 function messageOf(err: unknown): string {
@@ -289,12 +293,13 @@ export function createSelfPlayWorkerHandler(port: SelfPlayWorkerPort, deps: Self
   const shouldStop = () => stopRequested || (stopFlag !== null && Atomics.load(stopFlag, 0) !== 0);
 
   const onEngineLog = (text: string) => {
+    if ((init?.slot ?? 0) !== 0) return;
     if (forwardedLogs < MAX_FORWARDED_LOGS) {
       forwardedLogs++;
-      port.post({ type: "log", level: "info", message: `Engine (worker ${(init?.slot ?? 0) + 1}): ${text}` });
+      port.post({ type: "log", level: "info", message: `Engine: ${text}` });
     } else {
       suppressedLogs++;
-      if (suppressedLogs === 1) port.post({ type: "log", level: "info", message: `Further engine output of worker ${(init?.slot ?? 0) + 1} is not shown.` });
+      if (suppressedLogs === 1) port.post({ type: "log", level: "info", message: "Further engine output is not shown." });
     }
   };
 

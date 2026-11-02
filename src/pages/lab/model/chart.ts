@@ -109,3 +109,14 @@ export function bestPoint(series: readonly XY[]): XY | null {
   for (const p of series) if (!best || p.y < best.y) best = p;
   return best;
 }
+
+/**
+ * The lowest validation loss measured after a completed epoch, at the first x where it was
+ * reported. The trainer also measures the incoming network before its first step (epoch 0), but
+ * that is a starting point, not a result: the run never saves it, so it is not a candidate.
+ */
+export function bestValidation(rows: RunChartData["rows"]): XY | null {
+  let best: XY | null = null;
+  for (const r of rows) if (r.epoch >= 1 && r.valLoss !== null && r.valLoss > 0 && (!best || r.valLoss < best.y)) best = { x: r.x, y: r.valLoss };
+  return best;
+}

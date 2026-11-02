@@ -198,6 +198,12 @@ function scoreFromEval(v: number | null): Score | null {
   return Math.abs(v) >= MATE_CP ? { cp: v > 0 ? MATE_CP : -MATE_CP, mate: null } : { cp: v, mate: null };
 }
 
+/** The most recent non-null score of a per-ply list. */
+function lastScore(scores: ReadonlyArray<Score | null>): Score | null {
+  for (let i = scores.length - 1; i >= 0; i--) if (scores[i]) return scores[i];
+  return null;
+}
+
 function emptyEngineView(): EngineView {
   return { status: "loading", statusText: null, info: null, infoFen: null, score: null, logs: [], capabilities: null };
 }
@@ -310,7 +316,7 @@ export class GameController {
       moveDelayMs,
     };
     // The last stored evaluation, so the eval bar is not empty after a reload.
-    model.liveEval = [...model.whiteScores].reverse().find((s) => s !== null) ?? null;
+    model.liveEval = lastScore(model.whiteScores);
     const c = new GameController(deps, model, game);
     // A game that ended while its save was still in flight: save it now (same id, idempotent).
     if (p.end && !p.savedGameId && !p.saveSkipped) void c.saveRecord();
@@ -392,7 +398,8 @@ export class GameController {
       const ev = this.m.engines[s];
       if (ev) this.m.engines[s] = { ...ev, status: "waiting", info: null, infoFen: null };
     }
-    this.m.liveEval = null;
+    // The eval bar falls back to the last evaluation that is still part of the game.
+    this.m.liveEval = lastScore(this.m.whiteScores);
     this.setNotice("info", count === 1 ? "Took back one move." : `Took back ${count} moves.`);
     this.persist();
     this.beginTurn();

@@ -78,6 +78,15 @@ export default function SettingsPage({ query }: PageProps) {
     if (requested && SECTIONS.some((s) => s.id === requested)) jumpTo(requested);
   }, [requested, jumpTo]);
 
+  // The window title names the page, as the Workshop and Help do.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = "Settings · Chess Builder";
+    return () => {
+      document.title = previous;
+    };
+  }, []);
+
   return (
     <div className="page settings-page" ref={rootRef}>
       <header className="page-header">

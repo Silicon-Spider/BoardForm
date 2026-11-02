@@ -9,10 +9,12 @@
 //   one at a time; edits made while a save is running are saved right after it.
 // * A failed save keeps the edits (they are retried with the next edit or flush()) and reports
 //   the error; an engine that no longer exists ("gone") stops saving.
-// * close() (page unmount) flushes and switches to "save immediately", so late changes — e.g. the
-//   blocks editor delivering its last debounced edit while it unmounts — are not lost.
+// * close() (page unmount, or the page being hidden / unloaded) flushes and switches to "save
+//   immediately", so late changes — e.g. the blocks editor delivering its last debounced edit
+//   while it unmounts or on pagehide — are not lost. open() returns to debounced saving.
 //
-// No React and no storage imports: the page wires it up (useDraft.ts), tests drive it directly.
+// No React and no storage imports: the page wires it up (useDraft in Workshop.tsx), tests drive it
+// directly.
 import type { EngineRecord } from "@/types";
 
 export type SaveState = "saved" | "pending" | "saving" | "error";
@@ -90,6 +92,12 @@ export class EngineDraft {
     return this.hasPending || this.writing !== null;
   }
 
+  /** The edits not confirmed as stored yet (being written or waiting), or null when there are none. */
+  unsaved(): Partial<EngineRecord> | null {
+    if (!this.hasPending && this.inFlight === null) return null;
+    return { ...(this.inFlight ?? {}), ...this.pending };
+  }
+
   /** A stored version of the record (from the storage hooks or a save result); older ones are ignored. */
   receive(record: EngineRecord): void {
     if (record.id !== this.base.id || record === this.base) return;
@@ -134,13 +142,13 @@ export class EngineDraft {
     this.publish();
   }
 
-  /** Page unmount: save what is left and save later edits immediately. */
+  /** Page unmount or hidden page: save what is left and save later edits immediately. */
   close(): void {
     this.immediate = true;
     void this.flush();
   }
 
-  /** (Re)mount: back to debounced saving. */
+  /** (Re)mount or visible again: back to debounced saving. */
   open(): void {
     this.immediate = false;
   }

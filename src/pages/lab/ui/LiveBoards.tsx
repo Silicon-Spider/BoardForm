@@ -15,13 +15,25 @@ export function LiveBoards({ boards, max = 8, emptyText = "Starting games…" }:
         <figure key={b.slot} className="lab-board">
           <MiniBoard fen={b.fen} lastMove={b.lastMove} title={`${b.white} vs ${b.black}, ply ${b.ply}`} />
           <figcaption>
-            <span className="truncate" title={`${b.white} vs ${b.black}`}>
-              {b.white === b.black ? b.white : (
-                <>
-                  {b.white} <span className="faint">vs</span> {b.black}
-                </>
-              )}
-            </span>
+            {b.white === b.black ? (
+              <span className="truncate" title={b.white}>
+                {b.white}
+              </span>
+            ) : (
+              // Two different players (gating): one line each, with the colour they play.
+              <>
+                <span className="truncate lab-board-player" title={`White: ${b.white}`}>
+                  <span className="lab-board-side white" aria-hidden="true" />
+                  <span className="lab-sr">White: </span>
+                  {b.white}
+                </span>
+                <span className="truncate lab-board-player" title={`Black: ${b.black}`}>
+                  <span className="lab-board-side black" aria-hidden="true" />
+                  <span className="lab-sr">Black: </span>
+                  {b.black}
+                </span>
+              </>
+            )}
             <span className="faint num">ply {b.ply}</span>
           </figcaption>
         </figure>
@@ -44,7 +56,8 @@ export function ResultsText({ white, draw, black }: { white: number; draw: numbe
   );
 }
 
-export function SelfPlayProgressView({ p, title = "Games" }: { p: SelfPlayProgress; title?: string }) {
+/** `live` false: the job has ended (e.g. with an error), so no boards / "Starting games…". */
+export function SelfPlayProgressView({ p, title = "Games", live = true }: { p: SelfPlayProgress; title?: string; live?: boolean }) {
   const total = p.gamesTotal;
   return (
     <div className="stack">
@@ -60,10 +73,10 @@ export function SelfPlayProgressView({ p, title = "Games" }: { p: SelfPlayProgre
           { label: "Positions / s", value: formatCount(Math.round(p.posPerSec)) },
           { label: "White / draw / Black", value: <ResultsText {...p.results} /> },
           { label: "Average length", value: p.avgPlies > 0 ? countOf(Math.round(p.avgPlies), "ply", "plies") : "—" },
-          { label: "Workers", value: String(p.workers) },
+          live && { label: "Workers", value: String(p.workers) },
         ]}
       />
-      <LiveBoards boards={p.boards} />
+      {live && <LiveBoards boards={p.boards} />}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 // Hooks for the run pages: lock-based "running in another tab" detection and live chart points.
 import { useEffect, useRef, useState } from "react";
+import { toast } from "@/app/toast";
 import type { LiveRunState } from "@/training";
+import { errorMessage } from "../model/format";
 import type { ChartInputPoint } from "../model/chart";
 
 type LockInfo = { name?: string };
@@ -82,4 +84,24 @@ export function useLivePoints(live: LiveRunState | null): ChartInputPoint[] {
     });
   }, [train, cycle]);
   return points;
+}
+
+/**
+ * A switch bound to a stored boolean: it flips at once (the stored record follows a moment later
+ * through its storage hook), and flips back with an error toast if saving fails.
+ * Returns [checked, saving, set].
+ */
+export function useOptimisticToggle(stored: boolean, save: (on: boolean) => Promise<void>, failure: string): [boolean, boolean, (on: boolean) => void] {
+  const [pending, setPending] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (pending !== null && stored === pending) setPending(null);
+  }, [stored, pending]);
+  const set = (on: boolean) => {
+    setPending(on);
+    save(on).catch((e: unknown) => {
+      setPending(null);
+      toast(failure, { kind: "error", detail: errorMessage(e) });
+    });
+  };
+  return [pending ?? stored, pending !== null, set];
 }

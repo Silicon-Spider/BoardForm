@@ -92,6 +92,8 @@ describe("number formatting", () => {
     expect(formatLoss(0.0421345)).toBe("0.04213");
     expect(formatLoss(null)).toBe("—");
     expect(formatLoss(0.00001234)).toBe("1.23e-5");
+    expect(formatLoss(0.00001)).toBe("1e-5");
+    expect(formatLoss(0.000025)).toBe("2.5e-5");
     expect(formatLr(0.001)).toBe("0.001");
     expect(formatLr(0.00001)).toBe("1e-5");
     expect(formatLr(0.000025)).toBe("2.5e-5");

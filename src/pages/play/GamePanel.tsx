@@ -27,14 +27,17 @@ export interface GamePanelProps {
   confirm: ConfirmFn;
 }
 
-function engineStatus(ev: EngineView): EngineCardStatus {
-  return ev.status === "loading" ? "loading" : ev.status;
+function engineStatus(ev: EngineView, phase: GameState["phase"]): EngineCardStatus {
+  // A paused engine game: say so rather than "Waiting".
+  return phase === "paused" && ev.status === "waiting" ? "paused" : ev.status;
 }
 
 function ResultBanner({ state, onRematch, onNewGame, onAnalyse, onRetrySave }: { state: GameState; onRematch(): void; onNewGame(): void; onAnalyse(): void; onRetrySave(): void }) {
   const end = state.end!;
   const aborted = end.termination === "aborted";
-  const tone = aborted ? "neutral" : end.winner === null ? "draw" : "win";
+  // Coloured from the point of view of the one human player; engine games and two-human games use "win".
+  const humans = SIDES.filter((s) => state.players[s].kind === "human");
+  const tone = aborted ? "neutral" : end.winner === null ? "draw" : humans.length === 1 && end.winner !== humans[0] ? "loss" : "win";
   const save = state.save;
   return (
     <div className={`play-result play-result--${tone}`} role="status" aria-live="polite">
@@ -208,7 +211,12 @@ export function GamePanel(props: GamePanelProps) {
           <div className="grow">
             <strong>Game paused while you were away</strong>
             <div className="small muted">
-              The clocks stopped when you left. {engineSides.length ? "The engines restart when you resume." : ""}
+              {[
+                SIDES.some((s) => state.clock[s] !== null) ? "The clocks stopped when you left." : null,
+                engineSides.length ? `${engineSides.length === 2 ? "The engines restart" : "The engine restarts"} when you resume.` : "Continue where you left off.",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             </div>
           </div>
           <div className="row-wrap">
@@ -319,7 +327,7 @@ export function GamePanel(props: GamePanelProps) {
             name={p.name}
             color={p.color}
             kind={p.engineKind}
-            status={engineStatus(ev)}
+            status={engineStatus(ev, state.phase)}
             statusText={ev.statusText}
             info={ev.info}
             infoFen={ev.infoFen}

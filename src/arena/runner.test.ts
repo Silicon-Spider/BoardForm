@@ -245,6 +245,30 @@ describe("MatchRunner", () => {
     expect(games.map((g) => g.white.name).sort()).toEqual(["Alpha (1)", "Alpha (2)"]);
   });
 
+  it("logs engine output, showing the host's repeating info-merge note once per engine", async () => {
+    const id = await createMatch(matchConfig({ gamesPerPairing: 2, concurrency: 1 }));
+    const deps = fakeDeps(undefined, {
+      async load(engineId, opts) {
+        // Every search of a fast engine can end with this note from the engine worker.
+        const e = new FakeEngine(() => {
+          opts.onLog("[host] the engine sent info very often; 12 reports were merged (report once per iteration to avoid this)");
+          return {};
+        }, engineId);
+        opts.onLog("hello from the engine");
+        opts.onLog("[host] 3 more log lines from this call were suppressed");
+        return e;
+      },
+    });
+    await new MatchRunner(id, deps).run();
+    const log = getLiveMatch(id)?.log ?? [];
+    const notes = log.filter((l) => l.text.includes("sent info very often"));
+    expect(notes.map((l) => l.text.split(":")[0]).sort()).toEqual(["Alpha", "Beta"]);
+    expect(notes.every((l) => l.level === "info" && l.text.endsWith("(shown once)"))).toBe(true);
+    // Other output is unchanged: engine lines are info, other host notes are warnings.
+    expect(log.find((l) => l.text === "Alpha: hello from the engine")?.level).toBe("info");
+    expect(log.find((l) => l.text.startsWith("Beta: [host] 3 more"))?.level).toBe("warn");
+  });
+
   it("refuses to start a finished match", async () => {
     const id = await createMatch(matchConfig(), { status: "finished" });
     const runner = new MatchRunner(id, fakeDeps());

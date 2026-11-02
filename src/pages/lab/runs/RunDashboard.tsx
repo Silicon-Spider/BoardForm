@@ -27,14 +27,14 @@ import { ConfigSummary } from "../ui/ConfigSummary";
 import { LabIcon } from "../ui/icons";
 import { SampleEvalTable, useSampleEvals } from "../ui/SampleEvals";
 import { DeleteRunDialog } from "./DeleteRunDialog";
-import { useLivePoints, useLockHeld, useSettled } from "./hooks";
+import { useLivePoints, useLockHeld, useOptimisticToggle, useSettled } from "./hooks";
 import { LiveProgress } from "./LiveProgress";
 import { NetworkHistory } from "./NetworkHistory";
 import { PhaseStepper } from "./PhaseStepper";
 import { RunCharts } from "./RunCharts";
 import { RunLog } from "./RunLog";
 
-type Busy = null | "start" | "pause" | "stop" | "play" | "auto";
+type Busy = null | "start" | "pause" | "stop" | "play";
 
 export function RunDashboard({ runId }: { runId: string }) {
   const run = useTrainingRun(runId);
@@ -94,8 +94,17 @@ function RunDashboardView({
   const playNetworkId = accepted?.networkId ?? run.networkId;
   const publishedEngine = run.engineId ? (engines?.find((e) => e.id === run.engineId) ?? null) : null;
 
-  const newestEvals = useSampleEvals(newest?.networkId ?? run.networkId);
-  const previousEvals = useSampleEvals(previous?.networkId ?? null);
+  // A continued / widened run starts from an existing network: show it before the first new
+  // network exists, and compare the first new network against it.
+  const sourceNetworkId = cfg.network.mode === "new" ? null : cfg.network.networkId;
+  const sourceExists = !!sourceNetworkId && !!networks?.some((n) => n.id === sourceNetworkId);
+  const evalCurrentId = newest?.networkId ?? run.networkId ?? (sourceExists ? sourceNetworkId : null);
+  const evalPreviousId = previous?.networkId ?? (newest && sourceExists ? sourceNetworkId : null);
+  const newestEvals = useSampleEvals(evalCurrentId);
+  const previousEvals = useSampleEvals(evalPreviousId);
+  const currentEvalLabel =
+    !newest && !run.networkId ? "Starting network" : cfg.loop.enabled ? `Cycle ${(newest?.cycle ?? cycle) + 1}` : evalPreviousId ? "After" : "Network";
+  const previousEvalLabel = previous ? `Cycle ${previous.cycle + 1}` : cfg.loop.enabled ? "Start" : "Before";
 
   const act = async (kind: Exclude<Busy, null>, fn: () => Promise<void>, failure: string) => {
     setBusy(kind);
@@ -120,7 +129,7 @@ function RunDashboardView({
       },
       "Could not open Play",
     );
-  const setAuto = (on: boolean) => act("auto", () => training.setAutoResume(run.id, on), "Could not change auto-resume");
+  const [autoResume, savingAuto, setAuto] = useOptimisticToggle(run.autoResume, (on) => training.setAutoResume(run.id, on), "Could not change auto-resume");
 
   // An errored run gets its Retry button in the error notice instead.
   const canStart = !activeHere && !elsewhere && status !== "error" && (canStartStatus(status) || stale);
@@ -205,9 +214,9 @@ function RunDashboardView({
 
         <div className="lab-run-subbar">
           <Switch
-            checked={run.autoResume}
-            disabled={busy === "auto"}
-            onChange={(on) => void setAuto(on)}
+            checked={autoResume}
+            disabled={savingAuto}
+            onChange={setAuto}
             label="Keep training when I reopen the app"
             description="Browsers pause background work when the tab closes; this picks the run up again."
           />
@@ -264,13 +273,20 @@ function RunDashboardView({
             <NetworkHistory run={run} networks={networks} engines={engines} />
           </Panel>
           <Panel title="Sample evaluations" icon={<LabIcon name="target" />} id="lab-run-evals">
-            {newest || run.networkId ? (
-              <SampleEvalTable
-                current={newestEvals}
-                previous={previous ? previousEvals : null}
-                currentLabel={cfg.loop.enabled ? `Cycle ${(newest?.cycle ?? cycle) + 1}` : "Network"}
-                previousLabel={previous ? `Cycle ${previous.cycle + 1}` : "Previous"}
-              />
+            {evalCurrentId ? (
+              <div className="stack-sm">
+                {!newest && !run.networkId && (
+                  <p className="muted small" style={{ margin: 0 }}>
+                    No network trained yet — these are the evaluations of the network this run starts from.
+                  </p>
+                )}
+                <SampleEvalTable
+                  current={newestEvals}
+                  previous={evalPreviousId ? previousEvals : null}
+                  currentLabel={currentEvalLabel}
+                  previousLabel={previousEvalLabel}
+                />
+              </div>
             ) : (
               <p className="muted small" style={{ margin: 0 }}>
                 Once a network is trained, its evaluations of six standard positions appear here — next to the previous network's, so you can see what changed.

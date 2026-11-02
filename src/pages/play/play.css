@@ -344,6 +344,11 @@
   align-items: flex-start;
   flex-wrap: wrap;
 }
+/* Text on top, buttons underneath (callouts with several actions). */
+.play-callout--stack {
+  flex-direction: column;
+  align-items: stretch;
+}
 .play-input-error,
 .play-input-error:focus {
   border-color: var(--danger) !important;
@@ -630,6 +635,10 @@
 }
 .play-result--draw {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.play-result--loss {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface-2));
 }
 .play-result-head {
   display: flex;

@@ -57,3 +57,16 @@ export function signedInt(n: number): string {
 export function groupDigits(n: number): string {
   return Number.isFinite(n) ? Math.round(n).toLocaleString("en-US") : "—";
 }
+
+/**
+ * A friendly message when the text does not even have the shape of a FEN (the strict validator's
+ * messages assume it does), else null. "8 ranks separated by /, then the side to move".
+ */
+export function fenShapeProblem(text: string): string | null {
+  const fields = text.trim().split(/\s+/);
+  if (fields[0] === "") return "Paste or type a FEN, e.g. the start position: rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const ranks = fields[0].split("/").length;
+  if (ranks !== 8) return `A FEN starts with the 8 ranks of the board separated by “/” (this has ${ranks}).`;
+  if (fields.length < 2) return "The side to move is missing: add “ w” or “ b” after the pieces.";
+  return null;
+}

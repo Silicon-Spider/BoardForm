@@ -7,11 +7,15 @@ import { ChessGame, START_FEN, validateFen } from "@/chess";
 import { DEFAULT_WORKSPACE, GENERATOR_VERSION, generateEvalSource } from "@/blocks";
 import { assembleSources, sourceHashOf } from "@/engine-host/build";
 import { TEMPLATE_VERSION, defaultFilesFor, templateFiles } from "@/engine-host/templates";
-import type { EngineRecord } from "@/types";
+import type { CompileResult, EngineRecord } from "@/types";
 import { EngineDraft } from "./draft";
 import { closeTab, newFileContents, openTab, pruneTabs, renameInFiles, renameTab, sortPaths, withExtension, withoutFile } from "./files";
-import { groupDigits, numberedLine, signedInt, whitePovScore } from "./format";
+import { fenShapeProblem, groupDigits, numberedLine, signedInt, whitePovScore } from "./format";
 import { BENCH_POSITIONS, PERFT_SUITE, PRESET_POSITIONS, expectedPerft, perftSuiteNodes } from "./positions";
+import { buildPillFor } from "./status";
+import { missingRequiredExports, type BuildRun, type EngineBuildState } from "./build-store";
+import { REQUIRED_FUNCTIONS } from "@/engine-host/abi";
+import { clearBackup, editsToRestore, readBackup, writeBackup } from "./unsaved";
 import { blocksPatch, blocksToCodeRecord, conversionFor, convertedEvalSource, duplicateRecord, filePatch, parseTags, uniqueName, unlockFullRecord } from "./records";
 
 function engine(overrides: Partial<EngineRecord> = {}): EngineRecord {
@@ -144,6 +148,14 @@ describe("record builders", () => {
     expect(await sourceHashOf(b)).toBe(await sourceHashOf(a));
   });
 
+  it("keeps the build of a converted engine only while the code is identical", () => {
+    const code = generateEvalSource(DEFAULT_WORKSPACE).code;
+    const build = { sourceHash: "h", wasm: new ArrayBuffer(8), builtAt: 1, compiler: "asc", sizeBytes: 8, compileMs: 1, warnings: 0 };
+    const src = engine({ kind: "blocks", name: "Blocky", blocks: structuredClone(DEFAULT_WORKSPACE), files: { "eval.ts": code }, build });
+    expect(blocksToCodeRecord(src, code, deps, TEMPLATE_VERSION).build).toBe(build);
+    expect(blocksToCodeRecord(src, convertedEvalSource(code, "Blocky"), deps, TEMPLATE_VERSION).build).toBeNull();
+  });
+
   it("rewrites the generator's do-not-edit header of converted code", () => {
     const NL = String.fromCharCode(10);
     const code = generateEvalSource(DEFAULT_WORKSPACE).code;
@@ -203,6 +215,79 @@ describe("file helpers", () => {
   });
 });
 
+describe("build status pill", () => {
+  const idle: EngineBuildState = { running: 0, statusText: null, last: null };
+  const build = { sourceHash: "h1", wasm: new ArrayBuffer(4), builtAt: 1, compiler: "assemblyscript 0.28.20", sizeBytes: 75_776, compileMs: 900, warnings: 0 };
+  const failed = (hash: string | null, errors: number): BuildRun => {
+    const result: CompileResult = {
+      ok: false,
+      wasm: null,
+      diagnostics: Array.from({ length: errors }, (_, i) => ({ severity: "error" as const, message: `problem ${i + 1}`, file: "eval.ts", line: 3, column: 1, code: 2304 })),
+      log: "",
+      timeMs: 10,
+      compilerVersion: "assemblyscript 0.28.20",
+    };
+    return { seq: 1, at: 1, ok: false, compiled: true, result, sourceHash: hash, wallMs: 10, sizeBytes: null, problem: null };
+  };
+
+  it("shows up to date, needs build and not built yet", () => {
+    expect(buildPillFor(engine({ build }), idle, { hash: "h1", problem: null })).toMatchObject({ tone: "ok", text: "Up to date · 74.0 KB" });
+    expect(buildPillFor(engine({ build }), idle, { hash: "h2", problem: null })).toMatchObject({ tone: "warn", text: "Needs build" });
+    expect(buildPillFor(engine({ build: null }), idle, { hash: "h2", problem: null })).toMatchObject({ tone: "warn", text: "Not built yet" });
+    expect(buildPillFor(engine({ build }), idle, { hash: null, problem: null })).toMatchObject({ text: "Checking…" });
+  });
+
+  it("shows building progress, errors of the current sources and source problems", () => {
+    expect(buildPillFor(engine(), { running: 1, statusText: "Compiling…", last: null }, { hash: "h1", problem: null })).toMatchObject({ tone: "accent", text: "Compiling…", spinner: true });
+    expect(buildPillFor(engine(), { ...idle, last: failed("h1", 3) }, { hash: "h1", problem: null })).toMatchObject({ tone: "danger", text: "3 errors", title: "problem 1" });
+    expect(buildPillFor(engine(), { ...idle, last: failed("h1", 1) }, { hash: "h1", problem: null }).text).toBe("1 error");
+    // A failed build of other (older) sources does not count: the saved build matches these.
+    expect(buildPillFor(engine({ build }), { ...idle, last: failed("h0", 2) }, { hash: "h1", problem: null }).text).toBe("Up to date · 74.0 KB");
+    expect(buildPillFor(engine(), idle, { hash: null, problem: "The entry file main.ts does not exist." })).toMatchObject({ tone: "danger", text: "Can't build" });
+  });
+
+  it("warns when a successful build of the current sources is not a working engine", () => {
+    const run: BuildRun = { seq: 2, at: 1, ok: true, compiled: true, result: null, sourceHash: "h1", wallMs: 10, sizeBytes: 25, problem: null, missingExports: ["cb_go", "memory"] };
+    expect(buildPillFor(engine({ build }), { ...idle, last: run }, { hash: "h1", problem: null })).toMatchObject({ tone: "warn", text: "Not a working engine", title: "Built, but the module does not export cb_go, memory" });
+    // Edited since that build: the usual "Needs build".
+    expect(buildPillFor(engine({ build }), { ...idle, last: run }, { hash: "h2", problem: null }).text).toBe("Needs build");
+    expect(buildPillFor(engine({ build }), { ...idle, last: { ...run, missingExports: [] } }, { hash: "h1", problem: null }).text).toBe("Up to date · 74.0 KB");
+  });
+
+  it("describes uploaded modules", () => {
+    expect(buildPillFor(engine({ kind: "wasm", files: undefined, wasm: new ArrayBuffer(2048) }), idle, { hash: null, problem: null }).text).toBe("Module · 2.0 KB");
+    expect(buildPillFor(engine({ kind: "wasm", files: undefined }), idle, { hash: null, problem: null }).text).toBe("No module");
+  });
+});
+
+/** A tiny WebAssembly module exporting empty functions with the given names (and a memory). */
+function wasmModule(functions: readonly string[], withMemory: boolean): ArrayBuffer {
+  const leb = (n: number): number[] => (n < 0x80 ? [n] : [(n & 0x7f) | 0x80, ...leb(n >> 7)]);
+  const name = (s: string) => [...leb(s.length), ...Array.from(s, (c) => c.charCodeAt(0))];
+  const bytes = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+  const section = (id: number, body: number[]) => bytes.push(id, ...leb(body.length), ...body);
+  const n = functions.length;
+  section(1, [1, 0x60, 0, 0]); // one type: () -> ()
+  section(3, [...leb(n), ...functions.map(() => 0)]);
+  if (withMemory) section(5, [1, 0x00, 1]);
+  const exports = [...functions.flatMap((f, i) => [...name(f), 0x00, ...leb(i)]), ...(withMemory ? [...name("memory"), 0x02, 0] : [])];
+  section(7, [...leb(n + (withMemory ? 1 : 0)), ...exports]);
+  section(10, [...leb(n), ...functions.flatMap(() => [2, 0, 0x0b])]);
+  return new Uint8Array(bytes).buffer;
+}
+
+describe("missingRequiredExports", () => {
+  it("lists the required ABI exports a compiled module lacks", async () => {
+    expect(await missingRequiredExports(wasmModule([...REQUIRED_FUNCTIONS], true))).toEqual([]);
+    expect(await missingRequiredExports(wasmModule(["cb_abi_version", "cb_init", "cb_in", "cb_out", "cb_new_game", "cb_position"], true))).toEqual(["cb_go"]);
+    expect(await missingRequiredExports(wasmModule([], false))).toEqual([...REQUIRED_FUNCTIONS, "memory"]);
+  });
+
+  it("says nothing when it cannot tell (not a module)", async () => {
+    expect(await missingRequiredExports(new Uint8Array([1, 2, 3]).buffer)).toEqual([]);
+  });
+});
+
 describe("formatting", () => {
   it("numbers SAN lines from the FEN", () => {
     expect(numberedLine(START_FEN, ["e4", "e5", "Nf3"])).toBe("1. e4 e5 2. Nf3");
@@ -218,6 +303,14 @@ describe("formatting", () => {
     expect(signedInt(-12)).toBe("−12");
     expect(signedInt(0)).toBe("0");
     expect(groupDigits(197281)).toBe("197,281");
+  });
+
+  it("explains text that is not shaped like a FEN", () => {
+    expect(fenShapeProblem(START_FEN)).toBeNull();
+    expect(fenShapeProblem("8/8/8/8/8/8/8/K6k w")).toBeNull();
+    expect(fenShapeProblem("not a fen")).toMatch(/8 ranks/);
+    expect(fenShapeProblem("   ")).toMatch(/Paste or type/);
+    expect(fenShapeProblem("8/8/8/8/8/8/8/K6k")).toMatch(/side to move/);
   });
 });
 
@@ -356,5 +449,75 @@ describe("EngineDraft", () => {
     other.discard();
     await vi.advanceTimersByTimeAsync(500);
     expect(repo.calls.some((c) => c.name === "never saved")).toBe(false);
+  });
+});
+
+describe("unsaved edits backup", () => {
+  /** An in-memory stand-in for localStorage. */
+  function memoryStorage() {
+    const data = new Map<string, string>();
+    return {
+      data,
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+      removeItem: (k: string) => void data.delete(k),
+    };
+  }
+
+  it("lists what is not stored yet: the write in flight plus newer edits", async () => {
+    vi.useFakeTimers();
+    try {
+      const save = vi.fn((_id: string, patch: Partial<EngineRecord>) => new Promise<EngineRecord>((resolve) => setTimeout(() => resolve(engine({ ...patch, updatedAt: 200 })), 20)));
+      const draft = new EngineDraft(engine(), save, { delayMs: 100 });
+      expect(draft.unsaved()).toBeNull();
+      draft.edit({ name: "A" });
+      expect(draft.unsaved()).toEqual({ name: "A" });
+      draft.close(); // the write of "A" starts
+      draft.edit({ description: "late" });
+      expect(draft.unsaved()).toEqual({ name: "A", description: "late" });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(draft.unsaved()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("round-trips through storage without module bytes and restores only newer edits", () => {
+    const storage = memoryStorage();
+    expect(writeBackup("e1", { files: { "eval.ts": "x" }, name: "N", wasm: new ArrayBuffer(4) }, 1_000, storage)).toBe(true);
+    const backup = readBackup("e1", storage);
+    expect(backup).toEqual({ at: 1_000, patch: { files: { "eval.ts": "x" }, name: "N" } });
+    // The stored record is older than the backup: the edits are missing from it.
+    expect(editsToRestore(backup, engine({ updatedAt: 900 }))).toEqual({ files: { "eval.ts": "x" }, name: "N" });
+    // Stored at or after the backup (the write made it, or another tab changed it since).
+    expect(editsToRestore(backup, engine({ updatedAt: 1_000 }))).toEqual({ files: { "eval.ts": "x" }, name: "N" });
+    expect(editsToRestore(backup, engine({ updatedAt: 1_001 }))).toBeNull();
+    expect(editsToRestore(null, engine())).toBeNull();
+    clearBackup("e1", storage);
+    expect(readBackup("e1", storage)).toBeNull();
+  });
+
+  it("ignores nothing-to-save patches, garbage and broken storage", () => {
+    const storage = memoryStorage();
+    expect(writeBackup("e1", { wasm: new ArrayBuffer(2) }, 1, storage)).toBe(false);
+    storage.setItem("cb.workshop.unsaved.e1", "{not json");
+    expect(readBackup("e1", storage)).toBeNull();
+    storage.setItem("cb.workshop.unsaved.e1", JSON.stringify({ at: "soon", patch: {} }));
+    expect(readBackup("e1", storage)).toBeNull();
+    const broken = {
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("quota");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    expect(writeBackup("e1", { name: "x" }, 1, broken)).toBe(false);
+    expect(readBackup("e1", broken)).toBeNull();
+    expect(() => clearBackup("e1", broken)).not.toThrow();
+    expect(writeBackup("e1", { name: "x" }, 1, null)).toBe(false);
   });
 });

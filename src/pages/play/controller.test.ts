@@ -270,6 +270,26 @@ describe("GameController: human vs engine", () => {
     c.dispose();
   });
 
+  it("after a takeback the eval bar shows the last evaluation still in the game", async () => {
+    // The engine (Black) reports +50 then +120 from its own point of view.
+    let reply = 0;
+    const scores = [50, 120];
+    const h = harness({ e1: new FakeEngine((g) => ({ ...done(g.legalMoves()[0]), info: info(scores[reply++] ?? 0) })) });
+    const c = startGame(h, HUMAN_SIDE, engineSide("e1"));
+    await until(c, (s) => s.phase === "playing");
+    c.humanMove("e2e4");
+    await until(c, (s) => s.moves.length === 2);
+    c.humanMove("d2d4");
+    await until(c, (s) => s.moves.length === 4);
+    expect(c.getState().liveEval).toEqual({ cp: -120, mate: null });
+    c.takeback();
+    expect(c.getState().moves.length).toBe(2);
+    expect(c.getState().liveEval).toEqual({ cp: -50, mate: null });
+    c.takeback();
+    expect(c.getState().liveEval).toBeNull();
+    c.dispose();
+  });
+
   it("takeback while the engine thinks stops it and undoes one ply", async () => {
     const thinker = new FakeEngine((_g, _l, e) => e.waitForStop());
     const h = harness({ e1: thinker });

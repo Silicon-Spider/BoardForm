@@ -90,6 +90,9 @@ export function ApproachIcon({ info, size = 20 }: { info: ApproachInfo; size?: n
 
 export const approachColor = (info: ApproachInfo): string => (info.kind ? kindColor(info.kind) : "var(--accent)");
 
+/** Shown under the Name field (not in the footer) when the name is empty. */
+const NAME_MISSING = "Give your engine a name.";
+
 const SCRATCH_VARIANTS: ReadonlyArray<{ id: ScratchVariant; title: string; description: string }> = [
   {
     id: "minimal",
@@ -185,7 +188,7 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
           ? "Checking the module…"
           : "Choose a working .wasm module."
         : trimmedName === ""
-          ? "Give your engine a name."
+          ? NAME_MISSING
           : null;
   const canCreate = step === "details" && approach !== null && missingRequirement === null && engines !== undefined && !busy;
 
@@ -267,7 +270,7 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
           <Icon name="prev" /> Back
         </button>
         <span className="spacer" />
-        {missingRequirement && !busy && <span className="small faint engines-wizard-hint">{missingRequirement}</span>}
+        {missingRequirement && missingRequirement !== NAME_MISSING && !busy && <span className="small faint engines-wizard-hint">{missingRequirement}</span>}
         <button type="button" className="btn" onClick={requestClose} disabled={busy}>
           Cancel
         </button>
@@ -328,7 +331,13 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
             </Field>
           )}
 
-          <Field label="Name" id={nameId} hint={nameTaken ? undefined : "Shown on cards, in games and in arena standings."} warning={nameTaken ? `You already have an engine called “${trimmedName}”. That works, but it can be confusing in matches.` : undefined}>
+          <Field
+            label="Name"
+            id={nameId}
+            hint="Shown on cards, in games and in arena standings."
+            warning={nameTaken ? `You already have an engine called “${trimmedName}”. That works, but it can be confusing in matches.` : undefined}
+            error={trimmedName === "" ? NAME_MISSING : undefined}
+          >
             <input
               id={nameId}
               className="input"
@@ -398,11 +407,13 @@ interface FieldProps {
   labelId?: string;
   hint?: ReactNode;
   warning?: ReactNode;
+  /** A problem that blocks "Create engine" (shown instead of the hint and the warning). */
+  error?: ReactNode;
   optional?: boolean;
   children: ReactNode;
 }
 
-function Field({ label, id, labelId, hint, warning, optional, children }: FieldProps) {
+function Field({ label, id, labelId, hint, warning, error, optional, children }: FieldProps) {
   return (
     <div className="field engines-field">
       {id ? (
@@ -416,7 +427,15 @@ function Field({ label, id, labelId, hint, warning, optional, children }: FieldP
         </span>
       )}
       {children}
-      {warning ? <div className="field-hint text-warn">{warning}</div> : hint ? <div className="field-hint">{hint}</div> : null}
+      {error ? (
+        <div className="field-error" role="alert">
+          {error}
+        </div>
+      ) : warning ? (
+        <div className="field-hint text-warn">{warning}</div>
+      ) : hint ? (
+        <div className="field-hint">{hint}</div>
+      ) : null}
     </div>
   );
 }

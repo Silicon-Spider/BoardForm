@@ -80,7 +80,7 @@ Training and dataset generation are not tied to the Lab page: switch to another 
 
 Browsers can't run anything once the tab is closed, so runs save checkpoints to the database as they go. **Pause** saves a checkpoint and stops the workers; **Stop** ends the run now and keeps the best network so far. Runs with **Keep training when I reopen the app** switched on start again by themselves when you reopen Chess Builder; others are marked as interrupted and wait for you. If you open the app in several tabs, only one of them runs a given job.
 
-How many workers may run at once — self-play workers, Arena games played at the same time and trainer threads — is set under **Background workers** in [Settings](#/settings).
+How many workers may run at once — self-play workers, Arena games played at the same time and trainer threads — is set under **Background workers** in [Settings](#/settings?section=engines).
 
 ## Using a network in an engine
 
@@ -142,7 +142,7 @@ These rules of thumb come from measurements with the in-browser trainer:
 | --- | --- |
 | `.nnue` | A network in the CBNN format — what engines load. **Export .nnue** to back a network up or use it elsewhere; **Import .nnue** on the Networks page to use one here (its full-precision weights are reconstructed from the integers, so you can keep training it). |
 | `.cbds` | A dataset of packed positions. |
-| text | One position per line: `<FEN> | <score> | <result>`, with the score in centipawns from White's point of view and the result `1.0`, `0.5` or `0.0` (White won, draw, Black won). |
+| text | One position per line: `<FEN> \| <score> \| <result>`, with the score in centipawns from White's point of view and the result `1.0`, `0.5` or `0.0` (White won, draw, Black won). |
 
 The exact formats are part of the reference below.
 

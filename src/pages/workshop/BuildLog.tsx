@@ -1,10 +1,12 @@
 // Build log tab: the last build (in memory for this session) with its diagnostics — clicking one
 // opens the file at that line — and the raw compiler output; otherwise the saved build's info.
 import { memo } from "react";
+import { Link } from "@/app/router";
 import { EmptyState, Icon } from "@/components";
 import type { CompileDiagnostic, EngineRecord } from "@/types";
 import { formatBytes, formatDuration, formatRelativeTime } from "@/utils/format";
 import type { EngineBuildState } from "./build-store";
+import { entryOf } from "./records";
 
 const SEVERITY_ORDER: Record<CompileDiagnostic["severity"], number> = { error: 0, warning: 1, info: 2 };
 
@@ -65,6 +67,12 @@ export const BuildLog = memo(function BuildLog({
             {last.result?.compilerVersion && <span>{last.result.compilerVersion}</span>}
           </div>
           {last.problem && <p className="workshop-buildlog-problem">{last.problem}</p>}
+          {last.ok && last.missingExports && last.missingExports.length > 0 && (
+            <div className="callout warn small workshop-buildlog-abi">
+              <strong>This module is not a working engine yet.</strong> It does not export {last.missingExports.join(", ")}. The entry file (
+              <span className="mono">{entryOf(view)}</span>) must export the ABI functions — see <Link to="/help/abi">Help → Engine ABI</Link>.
+            </div>
+          )}
           {!last.ok && editedSinceLast && <p className="small muted">You changed the code since this build — build again to check your fixes.</p>}
           {last.ok && editedSinceLast && <p className="small muted">The code changed since this build — build again to compile the new version.</p>}
         </div>

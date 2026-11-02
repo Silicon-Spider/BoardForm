@@ -12,16 +12,29 @@ import { describeEngineLimits } from "./scores";
 import { NETWORK_ENGINE_ID, resolveSelfPlayEngine, runSelfPlayJob } from "./selfplay-job";
 import type { DatasetJobState, DatasetSample, DatasetService, GenerateDatasetOptions, SelfPlayProgress } from "./types";
 
+/** A job writing a dataset: stop() ends it, persist() stores what it has buffered so far. */
+export interface GenerationJob {
+  stop(): Promise<void>;
+  persist?(): Promise<void>;
+}
+
 /** Datasets being written by a job of this tab (generation jobs and the self-play of runs). */
 export class GenerationRegistry {
-  private readonly jobs = new Map<string, { stop(): Promise<void> }>();
+  private readonly jobs = new Map<string, GenerationJob>();
 
   isGenerating(datasetId: string): boolean {
     return this.jobs.has(datasetId);
   }
 
-  add(datasetId: string, job: { stop(): Promise<void> }): void {
+  add(datasetId: string, job: GenerationJob): void {
     this.jobs.set(datasetId, job);
+  }
+
+  /** Stores every job's buffered positions now (the page is being hidden and may be closed). */
+  async persistAll(): Promise<void> {
+    await Promise.all(
+      [...this.jobs.values()].map((j) => j.persist?.().catch((e: unknown) => console.warn("[training] could not save a dataset's latest games", e))),
+    );
   }
 
   delete(datasetId: string): void {
@@ -57,7 +70,13 @@ export function selfPlayProblem(sp: SelfPlayConfig | null | undefined): string |
 
 export function createDatasetService(deps: ServiceDeps, registry: GenerationRegistry, hooks: DatasetServiceHooks): DatasetService {
   /** Runs one generation job in the background (never rejects). Releases `lock` at the end. */
-  async function runGeneration(dataset: DatasetRecord, opts: GenerateDatasetOptions, controller: AbortController, lock: LockHandle): Promise<void> {
+  async function runGeneration(
+    dataset: DatasetRecord,
+    opts: GenerateDatasetOptions,
+    controller: AbortController,
+    lock: LockHandle,
+    handle: { writer: DatasetWriter | null },
+  ): Promise<void> {
     const id = dataset.id;
     const sp = opts.selfPlay;
     const activityId = `dataset:${id}`;
@@ -66,11 +85,14 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
     const live = new Throttled(() => setDatasetJob(state), deps.timing.liveThrottleMs);
     const activity = () => {
       const p = state.progress;
+      // Until the workers report ready the engine is being built / instantiated (can take a while
+      // the first time an engine is used).
+      const starting = p.workers === 0 && p.gamesDone === 0;
       deps.notify.setActivity({
         id: activityId,
         kind: "selfplay",
         label: dataset.name,
-        detail: `${p.gamesDone}/${p.gamesTotal ?? "∞"} games · ${formatCount(p.positions)} positions`,
+        detail: starting ? "Preparing the engine…" : `${p.gamesDone}/${p.gamesTotal ?? "∞"} games · ${formatCount(p.positions)} positions`,
         progress: p.gamesTotal ? Math.min(1, p.gamesDone / p.gamesTotal) : null,
         href,
       });
@@ -90,6 +112,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
         return;
       }
       writer = await DatasetWriter.open(deps.datasets, id, deps.timing.datasetWriter);
+      handle.writer = writer;
       const workers = Math.max(1, Math.min(sp.concurrency, await deps.maxWorkers()));
       const summary = await runSelfPlayJob({
         source: deps.selfPlay,
@@ -110,6 +133,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       });
       await writer.close();
       writer = null;
+      handle.writer = null;
       state = { ...state, status: summary.stopped ? "stopped" : "finished" };
       const stored = await deps.datasets.get(id);
       deps.notify.toast(summary.stopped ? `Stopped generating "${dataset.name}"` : `Dataset "${dataset.name}" is ready`, {
@@ -123,6 +147,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       state = { ...state, status: "error", error: message };
       deps.notify.toast(`Generating "${dataset.name}" failed`, { kind: "error", detail: message });
     } finally {
+      handle.writer = null;
       clearInterval(activityTimer);
       live.cancel();
       state = { ...state, progress: { ...state.progress, workers: 0, boards: [] } };
@@ -190,14 +215,16 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
         lock = (await deps.locks.acquire(datasetLockKey(dataset.id))) ?? { release() {} };
       }
       const controller = new AbortController();
+      const handle: { writer: DatasetWriter | null } = { writer: null };
       let done: Promise<void> = Promise.resolve();
       registry.add(dataset.id, {
         stop: async () => {
           controller.abort();
           await done;
         },
+        persist: () => handle.writer?.persistNow() ?? Promise.resolve(),
       });
-      done = runGeneration(dataset, { ...opts, selfPlay: sp }, controller, lock);
+      done = runGeneration(dataset, { ...opts, selfPlay: sp }, controller, lock, handle);
       return dataset.id;
     },
 

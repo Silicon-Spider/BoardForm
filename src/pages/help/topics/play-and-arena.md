@@ -10,24 +10,25 @@ The [Play](#/play) page has two modes, **Play** and **Analysis**. In Play mode, 
 - **Players:** choose **Human** or one of your engines for White and for Black (the swap button between them exchanges the colours). Each engine gets its own [limits](#clocks-and-limits) and hash table size; a human player gets a clock or none.
 - **Start position:** **Standard**, a named **Opening**, **Random** moves for variety, or a **Custom** FEN.
 
-Then start the game and play:
+Then press **Start game** and play:
 
-- **Moving:** drag a piece, or click it and then click the target square. Legal-move dots mark where the selected piece can go (switch them off in [Settings](#/settings)). When a pawn promotes, pick the new piece.
+- **Moving:** drag a piece, or click it and then click the target square. Legal-move dots mark where the selected piece can go (switch them off in [Settings](#/settings?section=appearance)). When a pawn promotes, pick the new piece.
 - **Drawing on the board:** right-drag from one square to another to draw an arrow, or right-click a square to circle it — handy for planning. A left click clears the drawings.
 - **Following the engine:** its card shows the score, depth, nodes, speed and time of its search, its principal variation and a **Console** with anything it logs. The evaluation bar beside the board can be shown or hidden, and <kbd>F</kbd> flips the board.
-- **Ending a game early:** **Resign**, offer a **Draw** (agreed at once) or abort the game.
+- **Taking a move back:** **Takeback** undoes your last move (and the engine's reply).
+- **Ending a game early:** **Resign**, **Offer draw** or **Abort** (an aborted game has no result). An engine accepts a draw offer only after 20 moves each and only when its evaluation is within ±0.30 pawns; between two human players **Draw** ends the game at once.
 
 A game that is still running when you close the tab is paused and waits for you when you come back. The Workshop's **Play** button — or a link like `#/play?engine=<engine id>` — starts a game against that engine with you as White.
 
 ## Engine against engine
 
-Choose an engine for both colours and watch them play each other, each with its own limits. A **Move delay** pauses between the moves so you can follow the game. This is the quickest way to see how a change plays; to measure it, use the [Arena](#matches-and-tournaments).
+Choose an engine for both colours and watch them play each other, each with its own limits. A **Move delay** pauses between the moves so you can follow the game, **Pause** and **Resume** halt and continue it, and **Stop** ends it without a result. This is the quickest way to see how a change plays; to measure it, use the [Arena](#matches-and-tournaments).
 
 ## Analysis
 
-In **Analysis** mode, choose an engine to analyse with. It searches the position on the board continuously and shows its score and best line while you play moves or step through a game with <kbd>←</kbd> / <kbd>→</kbd>; whenever the position changes, it starts again on the new one. Scores can be shown from White's point of view or from the side to move's. Load any position as a FEN, or **start a game from this position**.
+In **Analysis** mode, choose an engine to analyse with. It searches the position on the board continuously and shows its score and best line while you play moves or step through a game with <kbd>←</kbd> / <kbd>→</kbd>; whenever the position changes, it starts again on the new one. Scores can be shown from White's point of view or from the side to move's. The **Position** tools set up a position piece by piece (**Set up…**), paste one (**Load FEN…**), load a game (**Import PGN…**), or turn the position on the board into a game against an engine (**Play from here**).
 
-Analysis uses an *infinite* search that runs until it is stopped. Chess Builder normally stops a search instantly through shared memory; when the browser doesn't allow that, it restarts the engine instead, which works just as well but takes a moment (**Instant engine stop** in [Settings](#/settings) shows which one you have).
+Analysis uses an *infinite* search that runs until it is stopped. Chess Builder normally stops a search instantly through shared memory; when the browser doesn't allow that, it restarts the engine instead, which works just as well but takes a moment (**Instant engine stop** in [Settings](#/settings?section=engines) shows which one you have).
 
 ## Clocks and limits
 
@@ -48,7 +49,7 @@ The rules end a game by **checkmate**, **stalemate**, **threefold repetition**, 
 
 ## Saved games
 
-Finished games are saved automatically, with their moves, the engines' evaluations and the time spent on every move. The **Saved games** tab lists them — all of them, only your own games or only Arena games — with a search box. Open a game to replay it on the analysis board, with a graph of the evaluations; **Download PGN** to use it in other chess programs; or **Import a PGN** to study a game from elsewhere.
+Finished games are saved automatically, with their moves, the engines' evaluations and the time spent on every move. The **Saved games** tab lists them — **All**, **My games** or **Matches** (Arena games) — with a search box once the list gets long. Open a game to replay it on the analysis board, with a graph of the evaluations; **Download PGN** to use it in other chess programs; or **Import PGN** to study a game from elsewhere.
 
 ## Matches and tournaments
 
@@ -59,8 +60,8 @@ The [Arena](#/arena) plays many games between engines and keeps score. **New mat
 - **Games per pairing:** colours alternate from game to game, so use an even number — then both engines play each opening with both colours.
 - **Openings:** the **Opening book** of named openings, **Random moves** (a number of random half-moves; the same **seed** gives the same openings), or **Start position** (every game from the start — deterministic engines may then play the same game over and over).
 - **Adjudication:** see [below](#adjudication).
-- **Games at once:** how many games run in parallel; each game runs two engines. The maximum is your **Background workers** setting in [Settings](#/settings).
-- **Save games**, needed to replay them and export them as PGN.
+- **Games at once:** how many games run in parallel; each game runs two engines. The maximum is your **Background workers** setting in [Settings](#/settings?section=engines).
+- **Save every game**, needed to replay the games and export them as PGN.
 
 With no match yet, **Quick match: Classic vs Blocky** plays four games at 10 seconds + 0.1 seconds per side, straight away.
 

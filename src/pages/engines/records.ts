@@ -4,6 +4,7 @@
 import { DEFAULT_WORKSPACE } from "@/blocks/default-workspace";
 import { GENERATOR_VERSION, generateEvalSource } from "@/blocks/generator";
 import { TEMPLATE_VERSION, defaultFilesFor, scratchFiles } from "@/engine-host/templates";
+import { deepEqual } from "@/storage/equal";
 import type { EngineKind, EngineRecord } from "@/types";
 
 /** The ways to start an engine offered by the new-engine wizard (an engine kind, or a copy). */
@@ -41,13 +42,16 @@ export const MAX_NAME_LENGTH = 80;
 
 const normalizeName = (s: string) => s.trim().toLocaleLowerCase();
 
+/** `base` + `suffix`, shortening `base` so the name stays within MAX_NAME_LENGTH. */
+const withSuffix = (base: string, suffix: string) => `${base.slice(0, Math.max(1, MAX_NAME_LENGTH - suffix.length)).trimEnd()}${suffix}`;
+
 /** `base`, or `base 2`, `base 3` ... — the first that no engine uses yet (case-insensitive). */
 export function uniqueName(base: string, taken: Iterable<string>): string {
   const used = new Set(Array.from(taken, normalizeName));
   const b = base.trim() || "Untitled engine";
   if (!used.has(normalizeName(b))) return b;
   for (let n = 2; ; n++) {
-    const candidate = `${b} ${n}`;
+    const candidate = withSuffix(b, ` ${n}`);
     if (!used.has(normalizeName(candidate))) return candidate;
   }
 }
@@ -60,10 +64,10 @@ export function copyName(name: string, taken: Iterable<string>): string {
   const used = new Set(Array.from(taken, normalizeName));
   const trimmed = name.trim() || "Untitled engine";
   const base = trimmed.replace(/\s*\(copy(?:\s+\d+)?\)$/i, "").trim() || trimmed;
-  const first = `${base} (copy)`;
+  const first = withSuffix(base, " (copy)");
   if (!used.has(normalizeName(first))) return first;
   for (let n = 2; ; n++) {
-    const candidate = `${base} (copy ${n})`;
+    const candidate = withSuffix(base, ` (copy ${n})`);
     if (!used.has(normalizeName(candidate))) return candidate;
   }
 }
@@ -141,6 +145,29 @@ export function isHexColor(value: string): boolean {
 
 /** Tag the seed gives the built-in starter engines (it goes with `builtin: true`). */
 export const STARTER_TAG = "starter";
+
+/**
+ * The freshly seeded starter engines that are not needed because the library already has an
+ * identical twin: a starter engine with the same kind and name whose blocks and source files are
+ * unchanged. "Restore starter engines" removes these again, so restoring never doubles a starter
+ * the user still has, while starters that were deleted or edited come back as fresh copies.
+ */
+export function redundantRestoredStarters(existing: readonly EngineRecord[], fresh: readonly EngineRecord[]): string[] {
+  const norm = (s: string | undefined) => (s ?? "").trim().toLocaleLowerCase();
+  return fresh
+    .filter((f) =>
+      existing.some(
+        (e) =>
+          e.id !== f.id &&
+          e.builtin &&
+          e.kind === f.kind &&
+          norm(e.name) === norm(f.name) &&
+          deepEqual(e.files ?? null, f.files ?? null) &&
+          deepEqual(e.blocks ?? null, f.blocks ?? null),
+      ),
+    )
+    .map((f) => f.id);
+}
 
 /**
  * A copy of `source`: a deep clone with a new id and name, not built-in, `parentId` pointing at the

@@ -115,7 +115,9 @@ export function blocksToCodeRecord(
     templateVersion,
     networkId: src.networkId ?? null,
     options: { ...src.options },
-    build: src.build ?? null,
+    // The build is only still valid when the code is unchanged (convertedEvalSource rewrites
+    // the header, so normally it is not): don't store a stale 70 KB module.
+    build: generatedCode === src.files?.["eval.ts"] ? (src.build ?? null) : null,
   };
 }
 

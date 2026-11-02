@@ -1,7 +1,7 @@
 // New-game form: quick presets, White / Black (human or any engine, with limits, clock and hash),
 // start position, move delay for engine games, and the Start button. Every change is saved
 // (setting "play.lastSetup") by the page.
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { EnginePicker, LimitsEditor, TIME_CONTROL_PRESETS, formatTimeControl, timeControlPresetId, type EnginePickerOption } from "@/components";
 import type { EngineRecord, TimeControl } from "@/types";
 import { NumberInput } from "./NumberInput";
@@ -139,8 +139,18 @@ export interface SetupPanelProps {
   starting?: boolean;
 }
 
-export function SetupPanel({ setup, engines, onChange, onStart, problems, defaultHashMb, moveDelayMs, onMoveDelay, notices, starting }: SetupPanelProps) {
+export function SetupPanel({ setup, engines, onChange, onStart, problems: setupProblems, defaultHashMb, moveDelayMs, onMoveDelay, notices, starting }: SetupPanelProps) {
   const noEngines = engines !== undefined && engines.length === 0;
+  // The number fields report only valid values: a field showing an error (e.g. "abc" as the time
+  // per move) keeps the last valid value in the setup. Starting then would silently use a value
+  // the form no longer shows, so the Start button waits until every field is valid.
+  const formRef = useRef<HTMLDivElement>(null);
+  const [invalidField, setInvalidField] = useState(false);
+  const checkFields = useCallback(() => {
+    requestAnimationFrame(() => setInvalidField(!!formRef.current?.querySelector('input[aria-invalid="true"]')));
+  }, []);
+  useEffect(checkFields, [setup, checkFields]);
+  const problems = invalidField ? [...setupProblems, "Fix the field marked in red first."] : setupProblems;
   const bothEngines = setup.white.player === "engine" && setup.black.player === "engine";
   /** One side changed; with linked clocks a new clock applies to both sides. */
   const update = (side: Side, next: SideSetup) => {
@@ -151,7 +161,7 @@ export function SetupPanel({ setup, engines, onChange, onStart, problems, defaul
   const preset = (id: PresetId) => engines && onChange(applyPreset(setup, id, engines));
 
   return (
-    <div className="play-setup">
+    <div className="play-setup" ref={formRef} onInput={checkFields} onClick={checkFields}>
       {notices}
       <section>
         <h3 className="section-title">Quick start</h3>

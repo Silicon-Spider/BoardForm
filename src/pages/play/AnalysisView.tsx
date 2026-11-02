@@ -124,7 +124,7 @@ function FenModal({ open, onClose, onLoad }: { open: boolean; onClose(): void; o
   const load = () => {
     const v = validateFen(text);
     if (!v.ok) {
-      setError(v.error ?? "Invalid FEN");
+      setError(`The FEN is not valid: ${v.error ?? "unknown problem"}.`);
       return;
     }
     onLoad(new ChessGame(text).startFen);
@@ -450,7 +450,8 @@ export function AnalysisView(props: AnalysisViewProps) {
                 )}
                 {engineId && (
                   <div>
-                    <Link to={`/engines/${engineId}`}>Open it in the Workshop</Link>
+                    {/* Like the game's build-error card: open the file with the first error. */}
+                    <Link to={`/engines/${engineId}${errors[0]?.file ? `?file=${encodeURIComponent(errors[0].file)}` : ""}`}>Open it in the Workshop</Link>
                   </div>
                 )}
               </div>

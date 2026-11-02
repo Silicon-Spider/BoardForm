@@ -119,7 +119,7 @@
   }
 }
 
-/* Read-only: no blinking caret, a quieter active line. */
+/* Read-only: a quieter active line (the caret stays, for keyboard selection and copying). */
 .cb-code-editor--readonly .cm-activeLine,
 .cb-code-editor--readonly .cm-activeLineGutter {
   background-color: transparent;

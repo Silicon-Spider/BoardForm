@@ -296,6 +296,12 @@
 .arena-leader .section-title {
   margin: 0;
 }
+.arena-leader-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 28px;
+  min-width: 0;
+}
 .arena-leader-name {
   display: flex;
   align-items: center;
@@ -913,4 +919,11 @@
   .arena-actions .btn {
     padding: 0 10px;
   }
+}
+.arena-form-seed .field-hint {
+  white-space: nowrap;
+}
+/* Engine games can move every few dozen ms: switch clock highlights instantly, not with a fade. */
+.cb-clock.arena-player-clock {
+  transition: none;
 }

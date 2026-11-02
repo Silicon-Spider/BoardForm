@@ -51,7 +51,8 @@ function EvalGraphImpl({ evals, startPly, currentPly, onSelectPly }: EvalGraphPr
         yMin={-bound}
         yMax={bound}
         xLabel="Move"
-        formatX={(x) => (Number.isInteger(x) && x > 0 ? plyLabel(x, startPly) : "Start")}
+        // Ticks of short games fall between plies (0.5, 1.5...): those get no label.
+        formatX={(x) => (x === 0 ? "Start" : Number.isInteger(x) && x > 0 ? plyLabel(x, startPly) : "")}
         formatY={formatPawns}
         xMarkers={currentPly !== null && currentPly > 0 ? [{ x: currentPly }] : undefined}
         onPointClick={(x) => onSelectPly(Math.round(x))}

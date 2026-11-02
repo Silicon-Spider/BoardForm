@@ -53,6 +53,23 @@ describe("DatasetWriter", () => {
     expect(rec).toMatchObject({ positions: 27, chunks: 3, games: 3 });
   });
 
+  it("persistNow stores the chunk being filled and keeps filling the same chunk", async () => {
+    const data = makeMaterialDataset(9, 4);
+    const w = await DatasetWriter.open(datasetsRepo, "ds", { chunkPositions: 10, partialFlushMs: Infinity, recordUpdateMs: 60_000 });
+    await w.add(data.subarray(0, 3 * PACKED_SIZE), 3);
+    await w.add(data.subarray(3 * PACKED_SIZE, 5 * PACKED_SIZE), 2);
+    expect(await datasetsRepo.chunkCount("ds")).toBe(0);
+    await w.persistNow(); // e.g. the tab is being hidden
+    expect(await chunkCounts("ds")).toEqual([5]);
+    expect(await datasetsRepo.get("ds")).toMatchObject({ positions: 5, chunks: 1, games: 2 });
+    await w.add(data.subarray(5 * PACKED_SIZE), 4);
+    await w.close();
+    expect(await chunkCounts("ds")).toEqual([9]);
+    expect(await storedBytes("ds")).toEqual(data);
+    expect(await datasetsRepo.get("ds")).toMatchObject({ positions: 9, chunks: 1, games: 3 });
+    await w.persistNow(); // closed: a no-op
+  });
+
   it("only counts games whose positions are all stored", async () => {
     const data = makeMaterialDataset(14, 2);
     const w = await DatasetWriter.open(datasetsRepo, "ds", { ...OPTS, recordUpdateMs: 0 });

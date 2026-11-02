@@ -5,14 +5,9 @@ import { Link } from "@/app/router";
 import { Icon, KindBadge, Tooltip } from "@/components";
 import type { EngineRecord } from "@/types";
 import type { DraftSnapshot } from "./draft";
+import type { BuildPillInfo } from "./status";
 import { MOD_KEY, MenuButton, Pill, type MenuItem } from "./ui";
 
-export interface BuildPillInfo {
-  tone: "ok" | "warn" | "danger" | "accent" | "neutral";
-  text: string;
-  title?: string;
-  spinner?: boolean;
-}
 
 export interface HeaderProps {
   view: EngineRecord;

@@ -378,11 +378,12 @@ export default function PlayPage({ query }: PageProps) {
         </div>
       )}
       {pendingStart && game && (
-        <div className="callout play-callout" role="alert">
-          <div className="grow">
+        <div className="callout play-callout play-callout--stack" role="alert">
+          <div>
             <strong>Start the game from the link?</strong>
             <div className="small muted">
-              Your game {game.players.w.name} vs {game.players.b.name} is not finished. Starting a new one aborts it (it is saved as unfinished).
+              Your game {game.players.w.name} vs {game.players.b.name} is not finished. Starting a new one aborts it
+              {game.moves.length > game.bookPlies ? " (it is saved as unfinished)." : " (no moves were played, so nothing is saved)."}
             </div>
           </div>
           <div className="row-wrap">
@@ -596,8 +597,22 @@ export default function PlayPage({ query }: PageProps) {
 
   const gameBadge = game && unfinished ? (game.phase === "paused" ? "paused" : game.phase === "interrupted" ? "waiting" : "live") : null;
 
+  // One-column layout (narrow screens): the board sits above the panel, so the "Start game" button
+  // or a saved game in the list is far below it. When a game starts or a game / line is opened,
+  // bring the board back into view instead of leaving the user scrolled down in the panel.
+  const pageRef = useRef<HTMLDivElement>(null);
+  const viewKey = mode === "play" ? (game ? `game:${game.id}` : "setup") : `analysis:${line.gameId ?? ""}`;
+  const lastViewKey = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = lastViewKey.current;
+    lastViewKey.current = viewKey;
+    if (prev === null || prev === viewKey || viewKey === "setup") return;
+    if (!window.matchMedia("(max-width: 900px)").matches) return;
+    pageRef.current?.querySelector(".play-board-col")?.scrollIntoView({ block: "nearest" });
+  }, [viewKey]);
+
   return (
-    <div className="page play-page">
+    <div className="page play-page" ref={pageRef}>
       <header className="play-header">
         <h1>Play</h1>
         <div className="btn-group play-seg play-modes" role="radiogroup" aria-label="Mode">

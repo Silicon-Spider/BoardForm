@@ -20,7 +20,7 @@ export interface LabService {
   networks: NetworkService;
   /** Start-up: resume or mark interrupted runs (idempotent). Resolves when done. */
   init(): Promise<void>;
-  /** Writes pending run state now (the page is being hidden). */
+  /** Writes pending run state and buffered self-play games now (the page is being hidden). */
   persistAll(): Promise<void>;
 }
 
@@ -146,8 +146,15 @@ export function createLabService(deps: ServiceDeps): LabService {
     const lock = await deps.locks.acquire(runId);
     if (!lock) throw new Error(`This run is running in another tab; ${status === "paused" ? "pause" : "stop"} it there.`);
     try {
-      const fresh = await deps.runs.get(runId);
+      let fresh = await deps.runs.get(runId);
       if (!fresh) return;
+      if (status === "stopped") {
+        // Keep the best network trained so far, as a stop during training does.
+        const controller = new RunController({ deps, registry, networks, onExit: () => undefined }, fresh);
+        await controller.saveIdleStopSnapshot();
+        fresh = await deps.runs.get(runId);
+        if (!fresh) return;
+      }
       await deps.runs.update(runId, {
         status,
         progress: { ...fresh.progress, phase: status },
@@ -307,7 +314,7 @@ export function createLabService(deps: ServiceDeps): LabService {
       return initPromise;
     },
     async persistAll() {
-      await Promise.all([...active.values()].map((e) => e.controller?.persistNow()));
+      await Promise.all([...[...active.values()].map((e) => e.controller?.persistNow()), registry.persistAll()]);
     },
   };
 }

@@ -171,11 +171,17 @@ describe("dataset files and the dataset service", () => {
 
   it("stop() keeps what was generated; remove() refuses while generating", async () => {
     const source = new FakeSelfPlaySource({ positionsPerGame: 10, gameDelayMs: 20 });
-    const lab = createLabService(testDeps({ selfPlay: source }));
+    const deps = testDeps({ selfPlay: source });
+    const lab = createLabService(deps);
     const id = await lab.datasets.generate({ name: "Endless", selfPlay: { ...SELFPLAY, games: 1000 } });
+    const activity = () => deps.notify.activities.get(`dataset:${id}`);
+    expect(activity()).toMatchObject({ detail: "Preparing the engine…", href: `/lab/datasets/${id}` });
     await until(async () => ((await datasetsRepo.get(id))?.games ?? 0) >= 2, 10_000, "a few games");
     await expect(lab.datasets.remove(id)).rejects.toThrow(/still being generated/);
+    // The header activity is refreshed every second and switches to the game count once playing.
+    await until(() => /^\d+\/1000 games · /.test(activity()?.detail ?? ""), 5_000, "activity with the game count");
     await lab.datasets.stop(id);
+    expect(activity()).toBeUndefined();
     expect(lab.datasets.isGenerating(id)).toBe(false);
     expect(getDatasetJob(id)?.status).toBe("stopped");
     const rec = await datasetsRepo.get(id);

@@ -11,6 +11,8 @@ import { bestDataId, checkpointDataId } from "./constants";
 import { getLiveRun, useLiveRunStore } from "./live";
 import { createLabService } from "./service";
 import { thinPoints } from "./run-controller";
+import type { TrainerLike } from "./deps";
+import type { TrainProgress } from "@/nnue/protocol";
 import { FakeLocks, FakeSelfPlaySource, ScriptedTrainer, inProcessTrainer, runConfig, testDeps, testEngine, until } from "./test-helpers";
 
 async function storeDataset(id: string, positions: number, seed: number): Promise<void> {
@@ -26,6 +28,24 @@ async function storeDataset(id: string, positions: number, seed: number): Promis
 }
 
 const run = (id: string) => runsRepo.get(id) as Promise<TrainingRunRecord>;
+
+type LabService = ReturnType<typeof createLabService>;
+
+/** Wraps a trainer so `hook` sees every progress report (after the run's own handler). */
+function onProgress(trainer: TrainerLike, hook: (p: TrainProgress) => void): TrainerLike {
+  return {
+    start: (job, handlers = {}) =>
+      trainer.start(job, {
+        ...handlers,
+        onProgress: (p) => {
+          handlers.onProgress?.(p);
+          hook(p);
+        },
+      }),
+    stop: () => trainer.stop(),
+    terminate: () => trainer.terminate(),
+  };
+}
 
 async function waitStatus(id: string, statuses: TrainingRunStatus[], timeoutMs = 30_000): Promise<TrainingRunRecord> {
   let last: TrainingRunRecord | undefined;
@@ -157,9 +177,10 @@ describe("training runs", () => {
 
   it("pause → start resumes from the checkpoint bit-identically (real trainer)", async () => {
     await storeDataset("ds", 3000, 9);
+    // 85 steps per epoch, 255 in all: the pause below lands well inside the run.
     const config = runConfig({
       data: { datasetIds: ["ds"], selfPlay: null },
-      hyper: { ...runConfig().hyper, epochs: 3, batchSize: 128, validationSplit: 0.1, seed: 5 },
+      hyper: { ...runConfig().hyper, epochs: 3, batchSize: 32, validationSplit: 0.1, seed: 5 },
     });
     // Reference: uninterrupted.
     const refLab = createLabService(testDeps({ createTrainer: inProcessTrainer }));
@@ -167,13 +188,21 @@ describe("training runs", () => {
     const ref = await waitStatus(refId, ["finished", "error"], 60_000);
     expect(ref.status, ref.error ?? "").toBe("finished");
 
-    const lab = createLabService(testDeps({ createTrainer: inProcessTrainer }));
-    const id = await lab.training.createRun(config);
-    await until(() => {
-      const t = getLiveRun(id)?.train;
-      return !!t && t.epoch * t.stepsPerEpoch + t.step >= t.stepsPerEpoch + 3;
-    }, 60_000, "training progress");
-    await lab.training.pause(id);
+    // Pause from inside the progress callback (a few steps into epoch 2), not by polling: the
+    // in-process trainer is fast enough to finish the whole run between two polls.
+    let id = "";
+    let pausing: Promise<void> | null = null;
+    const lab: LabService = createLabService(
+      testDeps({
+        createTrainer: () =>
+          onProgress(inProcessTrainer(), (p) => {
+            if (id && !pausing && p.epoch * p.stepsPerEpoch + p.step >= p.stepsPerEpoch + 3) pausing = lab.training.pause(id);
+          }),
+      }),
+    );
+    id = await lab.training.createRun(config);
+    await until(() => pausing !== null, 60_000, "training progress");
+    await pausing;
     const paused = await run(id);
     expect(paused.status).toBe("paused");
     expect(paused.resume?.cycle).toBe(0);
@@ -218,6 +247,39 @@ describe("training runs", () => {
     const final = await networksRepo.get(done.networkId!);
     expect(final).toMatchObject({ name: "Test run - c1", stats: { epochs: 8, valLoss: 0.125 } });
     expect(ScriptedTrainer.jobs.at(-1)?.resume).toEqual({ epoch: stopped.resume!.epoch, step: stopped.resume!.step });
+  });
+
+  it("stopping a paused run also keeps the best network so far (once)", async () => {
+    await storeDataset("ds", 400, 2);
+    const deps = testDeps({ createTrainer: () => new ScriptedTrainer({ valLoss: (e) => 1 / e, stepsPerEpoch: 6, stepMs: 5 }) });
+    const lab = createLabService(deps);
+    const id = await lab.training.createRun(runConfig({ data: { datasetIds: ["ds"], selfPlay: null }, hyper: { ...runConfig().hyper, epochs: 8 } }));
+    await until(() => (getLiveRun(id)?.train?.epoch ?? 0) >= 2, 20_000, "two epochs");
+    await lab.training.pause(id);
+    expect((await run(id)).networkHistory).toEqual([]);
+    expect(getLiveRun(id)).toBeNull();
+
+    await lab.training.stop(id); // not executing: stopped from the stored checkpoints
+    const stopped = await run(id);
+    expect(stopped.status).toBe("stopped");
+    expect(stopped.log.at(-1)?.message).toBe("Stopped.");
+    expect(stopped.networkHistory).toHaveLength(1);
+    const snap = await networksRepo.get(stopped.networkHistory[0]!.networkId);
+    expect(snap?.name).toMatch(/^Test run - c1 \(stopped, epoch \d\/8\)$/);
+    expect(snap?.stats.valLoss).toBe(1 / (snap?.stats.epochs ?? 0)); // the best epoch end so far
+    expect(stopped.networkId).toBe(snap?.id);
+    expect(getLiveRun(id)).toBeNull();
+    expect(deps.notify.activities.has(`training:${id}`)).toBe(false);
+
+    // Continue, pause again before a better epoch end, stop: no second copy of the same network.
+    await lab.training.start(id);
+    await lab.training.pause(id);
+    await lab.training.stop(id);
+    const again = await run(id);
+    expect(again.status).toBe("stopped");
+    const snapshots = again.networkHistory.filter((h) => h.cycle === 0);
+    const names = await Promise.all(snapshots.map(async (h) => (await networksRepo.get(h.networkId))?.stats.positionsSeen));
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it("errors leave a resumable run with the message in the log", async () => {

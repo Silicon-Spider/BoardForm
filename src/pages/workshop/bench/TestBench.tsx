@@ -6,7 +6,7 @@ import { useBoardProps } from "@/app/preferences";
 import { toast } from "@/app/toast";
 import { ChessGame, START_FEN, normalizeFen, validateFen, type MoveInput } from "@/chess";
 import { BoardEditor, Chessboard, Icon, Modal, Tabs, type ChessboardArrow } from "@/components";
-import { sideOf } from "../format";
+import { fenShapeProblem, sideOf } from "../format";
 import { PRESET_POSITIONS } from "../positions";
 import type { EngineSession } from "../session";
 import { MenuButton } from "../ui";
@@ -95,7 +95,8 @@ function FenField({ fen, onApply }: { fen: string; onApply(fen: string): void })
     }
   }, [fen]);
   const apply = () => {
-    const check = validateFen(text);
+    const problem = fenShapeProblem(text);
+    const check = problem ? { ok: false, error: problem } : validateFen(text);
     if (!check.ok) {
       setError(check.error ?? "Invalid FEN");
       return;
