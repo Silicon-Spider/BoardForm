@@ -661,6 +661,12 @@ test.describe("NNUE Lab", () => {
   test("imports and exports networks and datasets, merges datasets, and continues / widens a network via the wizard", async ({ page }) => {
     const errors = trackErrors(page);
     await openApp(page, "#/lab/networks");
+    // The starter network is listed; without it the page shows its empty state.
+    await expect(page.getByText("Starter network (128 SCReLU)").first()).toBeVisible();
+    await page.evaluate(async () => {
+      const s = (await import(String("/src/storage/index.ts"))) as StorageModule;
+      await s.networksRepo.remove(s.STARTER_NETWORK_ID);
+    });
     await expect(page.getByRole("heading", { name: "No networks yet" })).toBeVisible();
     await captureViews(page, "networks-empty");
 
