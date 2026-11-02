@@ -106,7 +106,7 @@ const structure: BlockDefinition[] = [
     message0: "Evaluation",
     message1: "%1",
     args1: [{ type: "input_statement", name: "TERMS", check: TERM }],
-    message2: "score = White's terms − Black's terms",
+    message2: "score = White's terms − Black's terms, in points (100 points = 1 pawn)",
     style: "cb_root",
     tooltip:
       "The root of your evaluation. Put Term blocks inside it. Every term is worked out twice — once with White as “us” and once with Black as “us” — and the final score is White's total minus Black's total, in centipawns (100 = one pawn).",

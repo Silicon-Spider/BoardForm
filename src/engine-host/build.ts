@@ -54,7 +54,7 @@ export function assembleSources(engine: EngineRecord): { files: Record<string, s
   let files: Record<string, string>;
   switch (engine.kind) {
     case "wasm":
-      throw new Error(`"${engine.name}" is an uploaded WebAssembly module; it has no sources to compile.`);
+      throw new Error(`“${engine.name}” is an uploaded WebAssembly module; it has no sources to compile.`);
     case "blocks": {
       // Generated from the Blockly workspace on every change; building never needs Blockly. Code
       // stored by an older generator is regenerated from the saved blocks (the generator is
@@ -62,7 +62,7 @@ export function assembleSources(engine: EngineRecord): { files: Record<string, s
       const stale = engine.blocks != null && (engine.generatorVersion ?? 0) < GENERATOR_VERSION;
       const generated = stale ? generateEvalSource(engine.blocks as object).code : own["eval.ts"];
       if (!generated || !generated.trim()) {
-        throw new Error(`"${engine.name}" has no generated evaluation code yet. Open it in the Workshop to regenerate eval.ts from its blocks.`);
+        throw new Error(`“${engine.name}” has no generated evaluation code yet. Open it in the Workshop to regenerate eval.ts from its blocks.`);
       }
       files = { ...templateFiles, "eval.ts": generated };
       break;
@@ -76,10 +76,10 @@ export function assembleSources(engine: EngineRecord): { files: Record<string, s
       files = { ...own };
       break;
     default:
-      throw new Error(`"${engine.name}" has an unknown engine kind "${String((engine as { kind: unknown }).kind)}".`);
+      throw new Error(`“${engine.name}” has an unknown engine kind “${String((engine as { kind: unknown }).kind)}”.`);
   }
   if (!(entry in files)) {
-    throw new Error(`"${engine.name}" has no entry file ${entry}${Object.keys(files).length ? "" : " (it has no source files at all)"}.`);
+    throw new Error(`“${engine.name}” has no entry file ${entry}${Object.keys(files).length ? "" : " (it has no source files at all)"}.`);
   }
   return { files, entry };
 }
@@ -192,7 +192,7 @@ async function networkBytesFor(engine: EngineRecord): Promise<ArrayBuffer | null
   if (!engine.networkId) return null;
   const data = await networksRepo.getData(engine.networkId);
   if (!data || !data.quantized || data.quantized.byteLength === 0) {
-    throw new Error(`The NNUE network attached to "${engine.name}" no longer exists. Choose another network for this engine, or remove it.`);
+    throw new Error(`The NNUE network attached to “${engine.name}” no longer exists. Choose another network for this engine, or remove it.`);
   }
   return data.quantized;
 }
@@ -208,11 +208,11 @@ export async function getEngineArtifacts(
   let current = engine;
   let wasm: ArrayBuffer;
   if (engine.kind === "wasm") {
-    if (!engine.wasm || engine.wasm.byteLength === 0) throw new Error(`"${engine.name}" has no WebAssembly module. Upload one in the Workshop.`);
+    if (!engine.wasm || engine.wasm.byteLength === 0) throw new Error(`“${engine.name}” has no WebAssembly module yet. Open it in the Workshop and choose a .wasm file.`);
     wasm = engine.wasm;
   } else {
     const built = await buildEngine(engine, { onStatus: opts.onStatus });
-    if (!built.ok || !built.engine.build) throw new BuildError(built.result ?? failedResult("No build was produced."), `"${engine.name}"`);
+    if (!built.ok || !built.engine.build) throw new BuildError(built.result ?? failedResult("No build was produced."), `“${engine.name}”`);
     current = built.engine;
     wasm = built.engine.build.wasm;
   }

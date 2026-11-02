@@ -840,6 +840,7 @@ let hardDeadline: f64 = Infinity; // stop searching at this time (a cb_now() val
 let softDeadline: f64 = Infinity; // don't start another iteration after this time
 let stopped: bool = false; // a limit was hit: everything unwinds
 let selDepth: i32 = 0; // deepest ply reached in the current iteration
+let rootScore: i32 = 0; // score of the best root move found so far in this iteration
 
 // The principal variation (best line), as a "triangular" table: row `ply`
 // holds the best line from that ply on, pvLength[ply] moves long.
@@ -989,6 +990,7 @@ function negamax(depth: i32, alpha: i32, beta: i32, ply: i32, onPv: bool): i32 {
     if (score > alpha) {
       alpha = score;
       updatePv(ply, move);
+      if (ply == 0) rootScore = score; // remembered in case the search stops mid-iteration
       if (score >= beta) {
         if (quiet) storeKiller(ply, move);
         return beta; // beta cutoff
@@ -1037,6 +1039,8 @@ function think(maxDepth: i32): i32 {
   let bestMove = firstLegalMove();
   if (bestMove == NO_MOVE) return NO_MOVE; // checkmate or stalemate
 
+  let finishedDepth = 0; // the deepest iteration that ran to the end...
+  let finishedScore = 0; // ...and its score
   for (let depth = 1; depth <= maxDepth; depth++) {
     selDepth = 0;
     const score = negamax(depth, -INFINITY, INFINITY, 0, true);
@@ -1047,6 +1051,8 @@ function think(maxDepth: i32): i32 {
       break;
     }
     bestMove = pvTable[0];
+    finishedDepth = depth;
+    finishedScore = score;
     previousPvLength = pvLength[0];
     for (let i = 0; i < previousPvLength; i++) previousPv[i] = pvTable[i];
     reportProgress(depth, score);
@@ -1055,6 +1061,20 @@ function think(maxDepth: i32): i32 {
     if (abs(score) > MATE_BOUND && MATE - abs(score) <= depth) break;
     // The next iteration would probably not finish in time.
     if (cb_now() >= softDeadline) break;
+  }
+
+  // A node or time limit usually stops the search in the middle of an iteration.
+  // Report once more, so that the app sees the nodes and time of the whole
+  // search, with the unfinished iteration's best line if it found one (that is
+  // the move we play), otherwise the line of the last finished iteration.
+  if (stopped) {
+    if (pvLength[0] > 0) {
+      reportProgress(max(finishedDepth, 1), rootScore);
+    } else if (finishedDepth > 0) {
+      for (let i = 0; i < previousPvLength; i++) pvTable[i] = previousPv[i];
+      pvLength[0] = previousPvLength;
+      reportProgress(finishedDepth, finishedScore);
+    }
   }
   return bestMove;
 }

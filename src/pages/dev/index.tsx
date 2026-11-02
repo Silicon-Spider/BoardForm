@@ -343,9 +343,12 @@ function ClockEvalMovesDemo() {
             { mate: 3, label: "M3" },
             { mate: -5, label: "−M5" },
             { cp: null, label: "none" },
+            // Finished positions: the result replaces the (stale) engine score.
+            { mate: 1, label: "mate", fen: "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1" },
+            { cp: 0, label: "stale", fen: "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1" },
           ].map((e, i) => (
             <div key={i} className="dev-eval">
-              <EvalBar cp={e.cp ?? null} mate={e.mate ?? null} />
+              <EvalBar cp={e.cp ?? null} mate={e.mate ?? null} fen={e.fen} />
               <span className="small faint">{e.label}</span>
             </div>
           ))}

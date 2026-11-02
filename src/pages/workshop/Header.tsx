@@ -8,7 +8,6 @@ import type { DraftSnapshot } from "./draft";
 import type { BuildPillInfo } from "./status";
 import { MOD_KEY, MenuButton, Pill, type MenuItem } from "./ui";
 
-
 export interface HeaderProps {
   view: EngineRecord;
   save: DraftSnapshot;
@@ -53,7 +52,10 @@ function SaveIndicator({ save, onRetry }: { save: DraftSnapshot; onRetry(): void
   );
 }
 
-/** The engine name as an input that looks like a heading. Commits trimmed on blur / Enter. */
+/**
+ * The engine name as an input that looks like a heading. Commits trimmed on blur / Enter. A visually
+ * hidden <h1> gives screen-reader users the page heading the input cannot be.
+ */
 function NameField({ name, onRename }: { name: string; onRename(name: string): void }) {
   const [text, setText] = useState(name);
   const focused = useRef(false);
@@ -72,34 +74,37 @@ function NameField({ name, onRename }: { name: string; onRename(name: string): v
     }
   };
   return (
-    <input
-      className="workshop-name"
-      value={text}
-      size={Math.max(6, Math.min(40, text.length + 1))}
-      maxLength={80}
-      aria-label="Engine name"
-      spellCheck={false}
-      onFocus={() => {
-        focused.current = true;
-        before.current = name;
-      }}
-      onChange={(e) => {
-        setText(e.target.value);
-        if (e.target.value.trim()) onRename(e.target.value);
-      }}
-      onBlur={() => {
-        focused.current = false;
-        commit();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        if (e.key === "Escape") {
-          setText(before.current);
-          onRename(before.current);
-          requestAnimationFrame(() => (e.target as HTMLInputElement).blur());
-        }
-      }}
-    />
+    <>
+      <h1 className="sr-only">Workshop: {name}</h1>
+      <input
+        className="workshop-name"
+        value={text}
+        size={Math.max(6, Math.min(40, text.length + 1))}
+        maxLength={80}
+        aria-label="Engine name"
+        spellCheck={false}
+        onFocus={() => {
+          focused.current = true;
+          before.current = name;
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          if (e.target.value.trim()) onRename(e.target.value);
+        }}
+        onBlur={() => {
+          focused.current = false;
+          commit();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setText(before.current);
+            onRename(before.current);
+            requestAnimationFrame(() => (e.target as HTMLInputElement).blur());
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -127,7 +132,13 @@ export function WorkshopHeader({ view, save, buildPill, building, menu, onRename
       <div className="workshop-header-actions">
         {canBuild && (
           <Tooltip content={`Compile to WebAssembly (${MOD_KEY}+B)`} placement="bottom">
-            <button type="button" className="btn btn-primary" onClick={onBuild} disabled={building} aria-keyshortcuts={MOD_KEY === "⌘" ? "Meta+B" : "Control+B"}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onBuild}
+              disabled={building}
+              aria-keyshortcuts={MOD_KEY === "⌘" ? "Meta+B" : "Control+B"}
+            >
               {building ? <span className="spinner workshop-btn-spinner" aria-hidden="true" /> : <Icon name="play" size={14} />}
               {building ? "Building…" : "Build"}
             </button>

@@ -126,7 +126,7 @@ export function buildToolbox(): ToolboxDefinition {
         item(addEachTapered(5, 10, block("cb_pawn_structure", { fields: { SIDE: "US", KIND: "PASSED" } }))),
       ]),
       category("Ready-made terms", "cat_recipes", [
-        label("Drop these into the Evaluation block and tweak them"),
+        label("Drop these into the Evaluation block and tweak them · 100 points = one pawn"),
         ...RECIPES.map((r) => item(r)),
       ]),
       category("Classic eval", "cat_classic", [

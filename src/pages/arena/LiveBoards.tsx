@@ -178,7 +178,7 @@ export function LiveGameModal({ view, colorOf, lowTimeFor, onClose }: { view: Li
           <div className="arena-livegame-boardcol">
             <PlayerRow view={view} side={top} color={colorOf(top === "w" ? view.white.id : view.black.id)} lowTimeMs={lowTimeFor?.(view, top)} />
             <div className="arena-livegame-board">
-              <EvalBar cp={e.cp} mate={e.mate} orientation={flipped ? "black" : "white"} />
+              <EvalBar cp={e.cp} mate={e.mate} fen={view.fen} orientation={flipped ? "black" : "white"} />
               <div className="grow">
                 <Chessboard {...boardProps} fen={view.fen} lastMove={view.lastMove} interactive="none" orientation={flipped ? "black" : "white"} />
               </div>

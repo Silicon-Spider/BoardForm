@@ -1,6 +1,6 @@
 # Search limits and time controls
 
-How long an engine thinks about a move is up to you. Every engine in a game gets its own **search limits** — depth, nodes and time per move — and optionally a **clock**. The same limits editor appears on the Play page, in the Arena and in the NNUE Lab.
+How long an engine thinks about a move is up to you. Every engine in a game gets its own **search limits** — depth, nodes and time per move — and optionally a **clock**. The same limits editor appears on the Play page, in the Arena, in the Workshop's **Search** tool and in the NNUE Lab's self-play settings (the last two have no clock).
 
 ## Whichever comes first
 
@@ -13,7 +13,9 @@ All limits can be combined, and the engine stops at **whichever limit it reaches
 | Time per move | **Time per move** (seconds) | Spend at most this long on this move. |
 | Clock | **Time control** (**Clock** in compact editors) | A game clock: base time, increment, moves per control. The engine manages its own time. |
 
-Turn a limit on with its checkbox (in the compact version of the editor, type a value; an empty field means no limit). If you set no clock and no limit at all, the editor warns you — an engine without any limit would think forever — and in a game BoardForm then gives the engine one second per move.
+Turn a limit on with its checkbox (in the compact version of the editor, type a value; an empty field means no limit), or click one of the suggested values under the field. Node counts can be typed as `5000` or `5k`. If you set no clock and no limit at all, the editor warns you — an engine without any limit would think forever — and nothing starts until there is one.
+
+New settings start from sensible defaults: an engine on the Play page thinks **1 second per move**, a new Arena match gives every engine a **1+0** clock, the Workshop's Search tool searches **2 seconds**, and Lab self-play uses **5,000 nodes** per move.
 
 ## Depth
 
@@ -39,7 +41,7 @@ Small node limits make good sparring partners: an engine limited to a few thousa
 
 A **time control** gives each player a clock:
 
-- **Base time** — the time on the clock at the start, in minutes.
+- **Base time** — the time on the clock at the start. Type minutes (`5`), minutes and seconds (`1:30`) or seconds (`20 s`); it is shown as *5 min*, *1:30 min* or *20 s*. The shortest base time is 1 second, handy for very fast engine games.
 - **Increment** — seconds added after each move.
 - **Moves per control** (optional) — the number of moves in each time period, as in classical chess ("40 moves in 90 minutes"): each time a player completes a period, the base time is added to their clock again. Leave it empty for one period covering the whole game.
 
@@ -62,8 +64,9 @@ The node limit is checked at every position searched, the clock and the app's st
 
 The app doesn't rely on engines to stop by themselves:
 
-- With a **time per move**, it intervenes after the time plus 100 ms plus 10 %. In the Arena, that counts as a loss on time; on the Play page, without a clock, the late move is still played and the engine's console notes the overrun.
+- With a **time per move**, it intervenes after the time plus 100 ms plus 10 %. In the Arena, that counts as a loss on time; on the Play page the late move is still played (charged to the engine's clock, if it has one) and the engine's console notes the overrun.
 - With a **clock**, it intervenes when the engine's remaining time (plus 100 ms) is used up — the engine has lost on time.
+- With **only depth or node limits**, it stops a search after **60 seconds**. On the Play page the best move found so far is played and the console says why; in the Arena it counts as a loss on time. Deep searches get slow quickly — the small scratch engine Sprout needs about half a minute for depth 8 in a middlegame, the template engines about a second for depth 20 — so add a time per move or a clock when you set a high depth.
 - To intervene, it first asks the engine to stop, and terminates it one second later if it still doesn't answer. The engine is then restarted for the next move.
 
 In the Arena, the time an engine is charged is measured inside its own worker, so a busy page never costs it time; the Play page does the same whenever a slow page would otherwise make an engine lose on time.
@@ -78,7 +81,7 @@ What you want to measure decides the limits:
 - **Avoid fixed depth** for comparisons: it is unfair between engines that prune differently, and the time per move varies wildly.
 - **Very short time controls** exaggerate the cost of overhead (the template keeps 30 ms per move in reserve); below a few hundred milliseconds per move, results get noisy.
 - **Run at most one game per core** in timed matches, and keep other heavy work (such as a training run) off the computer while they run. Node-limited matches don't mind.
-- **Give both engines the same hash size.** A bigger transposition table helps in long games.
+- **Give both engines the same hash size** (1 to 512 MB; an engine without a transposition table, such as Sprout, ignores it). A bigger table helps in long games.
 
 ## Quick recipes
 

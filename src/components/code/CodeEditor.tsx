@@ -9,11 +9,11 @@
 //   * revealLine -> scroll + cursor + a short line highlight, whenever its nonce changes
 // Everything visual comes from CSS variables (theme.ts, CodeEditor.css), so the editor follows
 // the app's dark / light theme without being rebuilt.
-import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
-import { defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory } from "@codemirror/commands";
+import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap, completionStatus } from "@codemirror/autocomplete";
+import { defaultKeymap, history, historyKeymap, indentWithTab, isolateHistory, redo } from "@codemirror/commands";
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput, indentUnit } from "@codemirror/language";
 import { diagnosticCount, linter, lintGutter, lintKeymap, setDiagnostics, type Diagnostic } from "@codemirror/lint";
-import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
+import { gotoLine, highlightSelectionMatches, openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { Annotation, Compartment, EditorState, Prec, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   Decoration,
@@ -31,7 +31,7 @@ import {
 } from "@codemirror/view";
 import { useLayoutEffect, useRef, type JSX } from "react";
 import { memberOf } from "./api";
-import { assemblyScriptCompletions, importChange } from "./completion";
+import { assemblyScriptCompletions, importChange, templateImportBase } from "./completion";
 import { diagnosticRange } from "./diagnostics";
 import { isCodeLanguage, languageExtension, type EditorLanguage } from "./language";
 import { editorTheme } from "./theme";
@@ -79,6 +79,46 @@ const PHRASES: Record<string, string> = {
   unfold: "Unfold",
 };
 
+/**
+ * Tab accepts the highlighted completion. CodeMirror ignores keys for 75 ms after the popup opens
+ * (so a key pressed just as it appears is not taken as a choice) and while the options are still
+ * being worked out; a Tab in that moment used to fall through to indentWithTab and indent the line.
+ * Instead it waits a moment and accepts once the popup takes keys (or gives up if it closes).
+ */
+function tabAccept(view: EditorView): boolean {
+  if (acceptCompletion(view)) return true;
+  if (completionStatus(view.state) === null) return false;
+  const started = Date.now();
+  const retry = () => {
+    if (!view.dom.isConnected || acceptCompletion(view) || completionStatus(view.state) === null || Date.now() - started > 400) return;
+    setTimeout(retry, 20);
+  };
+  setTimeout(retry, 20);
+  return true;
+}
+
+/**
+ * Ctrl+H (the replace shortcut of most Windows / Linux editors; in the browser it would open the
+ * history page): the search panel with the cursor in its Replace field. Read-only documents have
+ * no Replace field, so the cursor stays in Find.
+ */
+function openReplacePanel(view: EditorView): boolean {
+  openSearchPanel(view);
+  const replace = view.dom.querySelector<HTMLInputElement>(".cm-search input[name=replace]");
+  if (replace) {
+    replace.focus();
+    replace.select();
+  }
+  return true;
+}
+
+/** A key press that would change the text (used to explain read-only documents). */
+function isEditKey(e: KeyboardEvent): boolean {
+  if (e.isComposing || e.altKey) return false;
+  if (e.ctrlKey || e.metaKey) return e.key.toLowerCase() === "x";
+  return e.key.length === 1 || e.key === "Enter" || e.key === "Backspace" || e.key === "Delete";
+}
+
 function foldMarker(open: boolean): HTMLElement {
   const el = document.createElement("span");
   el.className = "cb-code-fold" + (open ? "" : " is-folded");
@@ -112,7 +152,19 @@ function sharedExtensions(): Extension {
     EditorState.phrases.of(PHRASES),
     flashField,
     // Tab accepts an open completion; otherwise it indents (indentWithTab, below).
-    Prec.high(keymap.of([{ key: "Tab", run: acceptCompletion }])),
+    Prec.high(
+      keymap.of([
+        { key: "Tab", run: tabAccept },
+        { key: "Mod-h", run: openReplacePanel, preventDefault: true },
+        // Redo: CodeMirror binds Ctrl+Y on Windows and Ctrl+Shift+Z only on Linux / macOS; many
+        // Windows editors (VS Code among them) accept both.
+        { key: "Mod-Shift-z", run: redo, preventDefault: true },
+        // Go to line: CodeMirror's Ctrl+Alt+G is AltGr+G on Windows keyboards and never arrives.
+        // Ctrl+G is the usual key (VS Code); F3 / Enter in the search panel still find the next
+        // match, and Cmd+G keeps doing that on macOS.
+        { key: "Ctrl-g", run: gotoLine, preventDefault: true },
+      ]),
+    ),
     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...lintKeymap, indentWithTab]),
     editorTheme(),
   ];
@@ -163,6 +215,14 @@ const labelExtensions = new Map<string, Extension>();
 function labelExtension(label: string): Extension {
   let ext = labelExtensions.get(label);
   if (!ext) labelExtensions.set(label, (ext = EditorView.contentAttributes.of({ "aria-label": label })));
+  return ext;
+}
+
+const importBaseExtensions = new Map<string, Extension>();
+function importBaseExtension(base: string | null): Extension {
+  if (base === null) return NONE;
+  let ext = importBaseExtensions.get(base);
+  if (!ext) importBaseExtensions.set(base, (ext = templateImportBase.of(base)));
   return ext;
 }
 
@@ -225,6 +285,7 @@ interface Config {
   lint: boolean;
   dark: boolean;
   label: string;
+  importBase: string | null;
 }
 
 function configOf(p: CodeEditorProps): Config {
@@ -236,6 +297,7 @@ function configOf(p: CodeEditorProps): Config {
     lint: isCodeLanguage(language) || (p.diagnostics?.length ?? 0) > 0,
     dark: isDarkTheme(),
     label: p["aria-label"] ?? "Code editor",
+    importBase: p.importBase ?? null,
   };
 }
 
@@ -258,7 +320,7 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
 
   // Per-instance machinery, created once.
   const inst = useRef<{
-    comps: { language: Compartment; completion: Compartment; readOnly: Compartment; lint: Compartment; dark: Compartment; attrs: Compartment };
+    comps: { language: Compartment; completion: Compartment; readOnly: Compartment; lint: Compartment; dark: Compartment; attrs: Compartment; importBase: Compartment };
     extensions: Extension;
     /** Texts recently passed to onChange, newest last. */
     echoes: string[];
@@ -276,6 +338,7 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
       lint: new Compartment(),
       dark: new Compartment(),
       attrs: new Compartment(),
+      importBase: new Compartment(),
     };
     const extensions: Extension = [
       Prec.highest(
@@ -290,6 +353,22 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
           },
         ]),
       ),
+      // Typing, pasting, cutting or dropping into a read-only document: tell the parent (which
+      // can explain why nothing happens). The editor itself already ignores the edit.
+      EditorView.domEventHandlers({
+        keydown: (e, view) => {
+          if (view.state.readOnly && isEditKey(e)) propsRef.current.onReadOnlyEdit?.();
+          return false;
+        },
+        paste: (_e, view) => {
+          if (view.state.readOnly) propsRef.current.onReadOnlyEdit?.();
+          return false;
+        },
+        drop: (_e, view) => {
+          if (view.state.readOnly) propsRef.current.onReadOnlyEdit?.();
+          return false;
+        },
+      }),
       EditorView.updateListener.of((u) => {
         if (!u.transactions.some((tr) => tr.docChanged && !tr.annotation(externalChange))) return;
         const text = u.state.doc.toString();
@@ -311,6 +390,7 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
       comps.lint.of(cfg.lint ? lintExtension() : NONE),
       comps.dark.of(darkFlag(cfg.dark)),
       comps.attrs.of(labelExtension(cfg.label)),
+      comps.importBase.of(importBaseExtension(cfg.importBase)),
     ];
   };
 
@@ -329,6 +409,7 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
       [comps.lint, cfg.lint ? lintExtension() : NONE],
       [comps.dark, darkFlag(cfg.dark)],
       [comps.attrs, labelExtension(cfg.label)],
+      [comps.importBase, importBaseExtension(cfg.importBase)],
     ];
     // Every extension above is memoised, so identity tells whether anything changed.
     const effects = wanted.filter(([comp, ext]) => comp.get(view.state) !== ext).map(([comp, ext]) => comp.reconfigure(ext));
@@ -409,7 +490,7 @@ export function CodeEditor(props: CodeEditorProps): JSX.Element {
   useLayoutEffect(() => {
     const view = viewRef.current;
     if (view) syncConfig(view);
-  }, [props.readOnly, props.language, props.completions, props["aria-label"], hasDiagnostics]);
+  }, [props.readOnly, props.language, props.completions, props["aria-label"], props.importBase, hasDiagnostics]);
 
   // Diagnostics
   useLayoutEffect(() => {

@@ -19,17 +19,20 @@ createRoot(document.getElementById("root")!).render(
 );
 
 async function boot() {
-  try {
-    await ensureSeeded();
-  } catch (e) {
-    console.error("Seeding failed", e);
-    toast("Could not create the starter engines", { kind: "error", detail: String(e) });
-  }
+  // Seeding starts first, so whenSeeded() — which the services wait for — covers the starter
+  // engines. The services do not wait for the starter network's download (ensureSeeded does).
+  const seeding = ensureSeeded();
   try {
     initArenaService();
     initTrainingService();
   } catch (e) {
     console.error("Service init failed", e);
+  }
+  try {
+    await seeding;
+  } catch (e) {
+    console.error("Seeding failed", e);
+    toast("Could not create the starter engines", { kind: "error", detail: String(e) });
   }
 }
 void boot();

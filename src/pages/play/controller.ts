@@ -694,11 +694,15 @@ export class GameController {
       return;
     }
     if (result.stopReason === "timeout") {
+      const timeCapped = !!this.m.players[side].limits.movetimeMs;
       this.log(
         side,
-        before === null
-          ? `[play] ${name} overran its time limit (${formatDuration(used)}); the move was played anyway because this side has no clock.`
-          : `[play] ${name} overran its per-move limit (${formatDuration(used)}); the move counts because its clock still had time.`,
+        before !== null
+          ? `[play] ${name} overran its per-move limit (${formatDuration(used)}); the move counts because its clock still had time.`
+          : timeCapped
+            ? `[play] ${name} overran its time limit (${formatDuration(used)}); the move was played anyway because this side has no clock.`
+            : // Only depth / node caps: the host stopped the search at its safety limit (limits.ts).
+              `[play] ${name} was stopped after ${formatDuration(used)}, the longest a search limited only by depth or nodes may take; its best move so far was played. Lower the limit or add a time per move.`,
       );
     }
     this.recordMove(side, played, charged, score);

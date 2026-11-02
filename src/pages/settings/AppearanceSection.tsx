@@ -2,10 +2,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   BOARD_THEMES,
-  getThemePreference,
   setThemePreference,
   useBoardPreferences,
   useBoardProps,
+  useThemePreference,
   type BoardPreferences,
   type BoardTheme,
   type ThemePreference,
@@ -39,15 +39,13 @@ function useSystemPrefersDark(): boolean {
 }
 
 export function AppearanceSection() {
-  const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference());
+  // Follows changes made in other tabs too (useThemePreference listens for them).
+  const theme = useThemePreference();
   const [prefs, setPrefs] = useBoardPreferences();
   const systemDark = useSystemPrefersDark();
   const update = (patch: Partial<BoardPreferences>) => setPrefs({ ...prefs, ...patch });
 
-  const chooseTheme = (value: ThemePreference) => {
-    setThemePreference(value);
-    setTheme(value);
-  };
+  const chooseTheme = (value: ThemePreference) => setThemePreference(value);
 
   return (
     <SettingsSection id="appearance" title="Appearance" icon={<PageIcon name="palette" size={18} />} description="How the app and its chess boards look. Changes apply immediately.">

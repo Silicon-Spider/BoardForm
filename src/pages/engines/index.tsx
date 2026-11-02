@@ -2,10 +2,10 @@
 // and sort; actions to open, play, match, duplicate, export and delete; importing engine files;
 // and the new-engine wizard ("?new=1", optionally "&kind=<EngineKind>&networkId=<id>").
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { navigate, setQuery, type PageProps } from "@/app/router";
+import { Link, navigate, setQuery, type PageProps } from "@/app/router";
 import { toast } from "@/app/toast";
 import { EmptyState, Icon, KIND_LABELS, useConfirm } from "@/components";
-import { enginesRepo, importEngineFile, useEngines, useNetworks, useSetting } from "@/storage";
+import { enginesRepo, importEngineFile, settingsRepo, useEngines, useNetworks, useSetting } from "@/storage";
 import type { EngineKind, EngineRecord } from "@/types";
 import { plural } from "@/utils/format";
 import { pickFile } from "@/utils/misc";
@@ -32,6 +32,8 @@ import "./engines.css";
 
 /** Highlight for a card that was just created by "Duplicate". */
 const HIGHLIGHT_MS = 2400;
+/** Setting: the first-run welcome above the library was closed. */
+const WELCOME_DISMISSED_SETTING = "library.welcomeDismissed";
 
 export default function EnginesPage({ query }: PageProps) {
   const engines = useEngines();
@@ -42,6 +44,22 @@ export default function EnginesPage({ query }: PageProps) {
 
   const [storedKind, setStoredKind] = useSetting<string>(KIND_FILTER_SETTING, "all");
   const [storedSort, setStoredSort] = useSetting<string>(SORT_SETTING, "updated");
+  // Read once (not through useSetting, whose fallback would flash the welcome while loading).
+  const [welcome, setWelcome] = useState<"unknown" | "show" | "hidden">("unknown");
+  useEffect(() => {
+    let live = true;
+    settingsRepo
+      .get<boolean>(WELCOME_DISMISSED_SETTING, false)
+      .then((dismissed) => live && setWelcome(dismissed ? "hidden" : "show"))
+      .catch(() => live && setWelcome("hidden"));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const dismissWelcome = useCallback(() => {
+    setWelcome("hidden");
+    settingsRepo.set(WELCOME_DISMISSED_SETTING, true).catch((err: unknown) => console.warn("Could not save the welcome setting", err));
+  }, []);
   const kind: KindFilter = isKindFilter(storedKind) ? storedKind : "all";
   const sort: LibrarySort = isLibrarySort(storedSort) ? storedSort : "updated";
   // The search text lives in "?q=" as well, so Back from the Workshop (or a reload) keeps it.
@@ -185,6 +203,8 @@ export default function EnginesPage({ query }: PageProps) {
 
   const total = engines?.length ?? 0;
   const filtered = search.trim() !== "" || kind !== "all";
+  // The starter Blocky, for the welcome's "Duplicate Blocky" (the first thing Getting started suggests).
+  const blocky = engines?.find((e) => e.builtin && e.kind === "blocks" && e.name === "Blocky") ?? null;
 
   return (
     <div className="page engines-page">
@@ -203,6 +223,8 @@ export default function EnginesPage({ query }: PageProps) {
           </button>
         </div>
       </header>
+
+      {welcome === "show" && total > 0 && <WelcomeCallout blocky={blocky} names={(engines ?? []).map((e) => e.name)} onDismiss={dismissWelcome} />}
 
       {engines === undefined ? (
         <div className="engines-grid" aria-busy="true" aria-label="Loading your engines">
@@ -310,6 +332,48 @@ export default function EnginesPage({ query }: PageProps) {
   );
 }
 
+/** First-run welcome: where to start, until the user closes it. */
+function WelcomeCallout({ blocky, names, onDismiss }: { blocky: EngineRecord | null; names: string[]; onDismiss: () => void }) {
+  const [busy, setBusy] = useState(false);
+  // "Duplicate Blocky" opens the copy, ready for the first change; the original stays as the opponent.
+  const tryBlocky = async () => {
+    if (!blocky) return;
+    setBusy(true);
+    try {
+      const copy = await duplicateEngine(blocky, names);
+      navigate(`/engines/${encodeURIComponent(copy.id)}`);
+      toast(`Created “${copy.name}”`, { kind: "success", detail: "Change a bonus, then play it against Blocky." });
+    } catch (err) {
+      toast("Could not duplicate Blocky", { kind: "error", detail: errorMessage(err) });
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="callout engines-welcome" aria-labelledby="engines-welcome-title">
+      <div className="engines-welcome-text">
+        <h2 id="engines-welcome-title">New to BoardForm?</h2>
+        <p className="small muted">
+          The starter engines show four ways to build one: drag-and-drop blocks (Blocky), evaluation code (Classic), an engine written from scratch (Sprout)
+          and a trained neural network (Neuron). A good first step: duplicate Blocky, change a bonus, and play your version against the original.
+        </p>
+      </div>
+      <div className="engines-welcome-actions">
+        {blocky && (
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => void tryBlocky()} disabled={busy}>
+            {busy ? <span className="spinner" style={{ width: 12, height: 12 }} aria-hidden="true" /> : <Icon name="copy" size={14} />} Duplicate Blocky
+          </button>
+        )}
+        <Link to="/help/getting-started" className="btn btn-sm">
+          Getting started
+        </Link>
+      </div>
+      <button type="button" className="btn btn-ghost btn-icon btn-sm engines-welcome-close" onClick={onDismiss} aria-label="Close the welcome" title="Close">
+        <Icon name="close" size={14} />
+      </button>
+    </section>
+  );
+}
+
 /** First-run style empty state: the ways to build an engine, each opening the wizard. */
 function LibraryEmpty({ onNew, onRestore, restoring }: { onNew: (kind?: EngineKind) => void; onRestore: () => void; restoring: boolean }) {
   return (
@@ -353,7 +417,10 @@ function LibraryEmpty({ onNew, onRestore, restoring }: { onNew: (kind?: EngineKi
               ],
         )}
       </div>
-      <p className="small faint engines-empty-note">“Restore starter engines” brings back Blocky (blocks), Classic (evaluation code) and Sprout (a small engine written from scratch).</p>
+      <p className="small faint engines-empty-note">
+        “Restore starter engines” brings back Blocky (blocks), Classic (evaluation code), Sprout (a small engine written from scratch) and Neuron (the trained starter
+        network).
+      </p>
     </EmptyState>
   );
 }

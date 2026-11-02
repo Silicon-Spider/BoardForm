@@ -1,6 +1,16 @@
 import "fake-indexeddb/auto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BACKUP_FORMAT, ENGINE_FILE_FORMAT, exportBackup, exportEngineFile, importBackup, importEngineFile, uniqueImportName } from "./backup";
+import {
+  BACKUP_FORMAT,
+  ENGINE_FILE_FORMAT,
+  MAX_ENGINE_NAME_LENGTH,
+  MAX_NETWORK_NAME_LENGTH,
+  exportBackup,
+  exportEngineFile,
+  importBackup,
+  importEngineFile,
+  uniqueImportName,
+} from "./backup";
 import { decodeValue, encodeValue } from "./codec";
 import { StorageError } from "./db";
 import { deepEqual } from "./equal";
@@ -206,12 +216,15 @@ describe("exportEngineFile / importEngineFile", () => {
   it("exports an engine with its network and imports it as a new copy", async () => {
     await populate();
     const original = (await enginesRepo.get("e1"))!;
-    const blob = await exportEngineFile("e1");
-    const parsed = JSON.parse(await blob.text());
+    const exported = await exportEngineFile("e1");
+    const parsed = JSON.parse(await exported.text());
     expect(parsed.format).toBe(ENGINE_FILE_FORMAT);
     expect(parsed.engine.build).toBeNull(); // the stale build is not shipped
     expect(parsed.network.record.id).toBe("n1");
 
+    // A file whose network is not in this library (here: shared from another browser) brings its
+    // own copy of the network.
+    const blob = jsonBlob({ ...parsed, network: { ...parsed.network, record: { ...parsed.network.record, id: "elsewhere" } } });
     const newId = await importEngineFile(blob);
     expect(newId).not.toBe("e1");
     const copy = (await enginesRepo.get(newId))!;
@@ -235,6 +248,27 @@ describe("exportEngineFile / importEngineFile", () => {
     expect((await enginesRepo.get("e1"))?.networkId).toBe("n1");
     const third = await importEngineFile(blob);
     expect((await enginesRepo.get(third))?.name).toBe(`${original.name} (imported 2)`);
+  });
+
+  it("reuses the network when the library already has it (same id, same weights)", async () => {
+    await populate();
+    const before = (await networksRepo.list()).length;
+    const events: ChangeEvent[] = [];
+    offs.push(subscribe("*", (e) => events.push(e)));
+    const copy = (await enginesRepo.get(await importEngineFile(await exportEngineFile("e1"))))!;
+    expect(copy.networkId).toBe("n1");
+    expect(await networksRepo.list()).toHaveLength(before);
+    expect(events.map((e) => e.store)).toEqual(["engines"]);
+
+    // Same id but different weights (the network was replaced since the export): a separate copy.
+    const parsed = JSON.parse(await (await exportEngineFile("e1")).text());
+    const data = (await networksRepo.getData("n1"))!;
+    const changed = data.quantized.slice(0);
+    new Uint8Array(changed)[changed.byteLength - 1] ^= 1;
+    await networksRepo.putData({ ...data, quantized: changed });
+    const other = (await enginesRepo.get(await importEngineFile(jsonBlob(parsed))))!;
+    expect(other.networkId).not.toBe("n1");
+    expect(await networksRepo.list()).toHaveLength(before + 1);
   });
 
   it("keeps the name when it is free, and round-trips uploaded wasm modules", async () => {
@@ -290,5 +324,48 @@ describe("exportEngineFile / importEngineFile", () => {
     expect(uniqueImportName("Blocky", ["Classic"])).toBe("Blocky");
     expect(uniqueImportName("Blocky", ["blocky "])).toBe("Blocky (imported)");
     expect(uniqueImportName("Blocky", ["Blocky", "Blocky (imported)"])).toBe("Blocky (imported 2)");
+  });
+
+  it("keeps imported names within the name length limit", () => {
+    const long = "A".repeat(75) + " engine"; // 82 characters, longer than the limit already
+    const free = uniqueImportName(long, []);
+    expect(free).toBe("A".repeat(75) + " engi");
+    expect(free.length).toBe(MAX_ENGINE_NAME_LENGTH);
+    const name80 = "B".repeat(80);
+    const first = uniqueImportName(name80, [name80]);
+    expect(first).toBe("B".repeat(69) + " (imported)");
+    expect(first.length).toBe(80);
+    const second = uniqueImportName(name80, [name80, first]);
+    expect(second).toBe("B".repeat(67) + " (imported 2)");
+    expect(second.length).toBe(80);
+    // The shortened name never ends in a space or half an emoji.
+    expect(uniqueImportName("x".repeat(68) + " y" + "z".repeat(10), ["x".repeat(68) + " y" + "z".repeat(10)])).toBe("x".repeat(68) + " (imported)");
+    const emoji = "C".repeat(68) + "🐴" + "D".repeat(10); // the cut at 69 falls inside the emoji
+    expect(uniqueImportName(emoji, [emoji])).toBe("C".repeat(68) + " (imported)");
+    // Networks have their own limit.
+    expect(uniqueImportName("N".repeat(120), ["N".repeat(120)], MAX_NETWORK_NAME_LENGTH)).toHaveLength(120);
+  });
+
+  it("imports a long-named engine within the limit, also when its name is taken", async () => {
+    const name = "Long ".repeat(16).trim(); // 79 characters
+    await enginesRepo.put(makeEngine("long", { name }));
+    const blob = await exportEngineFile("long");
+    const copy = (await enginesRepo.get(await importEngineFile(blob)))!;
+    expect(copy.name.length).toBeLessThanOrEqual(MAX_ENGINE_NAME_LENGTH);
+    expect(copy.name).toMatch(/ \(imported\)$/);
+    const again = (await enginesRepo.get(await importEngineFile(blob)))!;
+    expect(again.name.length).toBeLessThanOrEqual(MAX_ENGINE_NAME_LENGTH);
+    expect(again.name).toMatch(/ \(imported 2\)$/);
+  });
+
+  it("imports an exported starter engine as an ordinary engine (not built in, no starter tag)", async () => {
+    await enginesRepo.put(makeEngine("neuron", { name: "Neuron", kind: "nnue", builtin: true, tags: ["starter", "nnue"] }));
+    const copy = (await enginesRepo.get(await importEngineFile(await exportEngineFile("neuron"))))!;
+    expect(copy.builtin).toBe(false);
+    expect(copy.tags).toEqual(["nnue"]);
+    expect(copy.name).toBe("Neuron (imported)");
+    // Tags that are not a list of strings are dropped rather than imported as they are.
+    const odd = jsonBlob({ format: ENGINE_FILE_FORMAT, version: 1, engine: { name: "Odd", kind: "eval", tags: ["mine", 3, null] }, network: null });
+    expect((await enginesRepo.get(await importEngineFile(odd)))?.tags).toEqual(["mine"]);
   });
 });

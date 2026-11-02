@@ -14,7 +14,7 @@
 }
 .cb-tabs .tab.active .cb-tab-badge {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .cb-tabs--sm .tab {
   padding: 6px 10px;

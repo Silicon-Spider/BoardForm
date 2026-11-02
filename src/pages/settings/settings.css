@@ -45,7 +45,7 @@
 }
 .settings-nav-link.is-active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .settings-nav-link--danger.is-active {
   background: var(--danger-soft);
@@ -79,7 +79,7 @@
   height: 32px;
   border-radius: 8px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .settings-section-title {
   margin: 0;
@@ -269,7 +269,7 @@
 .settings-board-theme.is-selected {
   border-color: var(--accent);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .settings-board-swatch {
   display: grid;

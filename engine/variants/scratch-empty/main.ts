@@ -10,9 +10,10 @@
 //  Where to look things up
 //    * The Engine ABI page in Help (docs/ENGINE_ABI.md): the exact rules for
 //      every cb_ function.
-//    * The "Minimal" from-scratch starter (engine/variants/scratch-minimal/main.ts):
-//      a complete small engine (0x88 board, alpha-beta search) written for
-//      learning. Peek at it whenever you get stuck.
+//    * The "Minimal working engine": a complete small engine in one file (0x88
+//      board, alpha-beta search) written for learning. Create one next to this
+//      one (Engines → New engine → From scratch → Minimal working engine) and
+//      peek at it whenever you get stuck.
 //    * https://www.chessprogramming.org — the encyclopedia of engine techniques.
 //
 //  The language is AssemblyScript: TypeScript syntax, compiled to WebAssembly.

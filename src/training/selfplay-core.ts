@@ -132,7 +132,7 @@ export async function playSelfPlayGame(engine: PlayingEngine, settings: GameSett
     searched++;
     nodes += r.info?.nodes ?? 0;
     const played = game.play(r.uci);
-    if (!played) throw new EngineGameError(`The engine played an illegal move "${r.uci}" (FEN ${fen}).`);
+    if (!played) throw new EngineGameError(`The engine played an illegal move “${r.uci}” (FEN ${fen}).`);
 
     const scoreWhite = toWhiteScore(scoreFromInfo(r.info), sideToMove);
     if (ply < settings.skipPlies) skipped.early++;
@@ -198,7 +198,7 @@ export async function playGatingGame(
     if (ctx.shouldStop()) return null;
     if (r === null) throw new EngineGameError(`The engine produced no move although legal moves exist (FEN ${fen}).`);
     const played = game.play(r.uci);
-    if (!played) throw new EngineGameError(`The engine played an illegal move "${r.uci}" (FEN ${fen}).`);
+    if (!played) throw new EngineGameError(`The engine played an illegal move “${r.uci}” (FEN ${fen}).`);
     const adjudicated = adjudicator.push(toWhiteScore(scoreFromInfo(r.info), sideToMove));
     ctx.onBoard?.(game.fen(), played.uci, game.ply());
     if (adjudicated !== null) {

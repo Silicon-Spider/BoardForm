@@ -475,7 +475,8 @@
 }
 .play-clock-custom {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Same columns as the engine side's custom clock (LimitsEditor compact). */
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
   padding: 8px;
   border-radius: var(--radius-sm);
@@ -863,7 +864,7 @@ button.play-pv-move {
 button.play-pv-move:hover,
 button.play-pv-move:focus-visible {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .play-console {
   border-top: 1px solid var(--border);
@@ -1071,7 +1072,7 @@ button.play-pv-move:focus-visible {
 }
 .play-gamerow-result--draw {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .play-gamerow-text {
   display: flex;

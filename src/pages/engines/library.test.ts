@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_WORKSPACE } from "@/blocks/default-workspace";
 import { GENERATOR_VERSION, generateEvalSource } from "@/blocks/generator";
 import { TEMPLATE_VERSION, defaultFilesFor, scratchFiles, templateFiles } from "@/engine-host/templates";
-import type { EngineRecord } from "@/types";
+import type { EngineRecord, NetworkRecord } from "@/types";
 import { checkedBuildStatus, immediateBuildStatus } from "./build-status";
 import { engineInitials } from "./EngineCard";
 import {
@@ -19,6 +19,7 @@ import {
   ENGINE_COLORS,
   copyName,
   createEngineRecord,
+  defaultNetworkId,
   duplicateEngineRecord,
   fileBaseName,
   isHexColor,
@@ -97,6 +98,28 @@ describe("suggestName", () => {
   it("fileBaseName strips folders and the extension", () => {
     expect(fileBaseName("a/b/c.wasm")).toBe("c");
     expect(fileBaseName("engine")).toBe("engine");
+  });
+});
+
+describe("defaultNetworkId", () => {
+  const net = (id: string, createdAt: number, positionsSeen: number): NetworkRecord => ({
+    id,
+    name: id,
+    description: "",
+    createdAt,
+    updatedAt: createdAt,
+    hidden: 128,
+    activation: 1,
+    parentId: null,
+    stats: { positionsSeen, epochs: positionsSeen > 0 ? 1 : 0, trainLoss: null, valLoss: null },
+    sizeBytes: 1000,
+  });
+  it("picks the newest trained network, never an untrained one", () => {
+    expect(defaultNetworkId(undefined)).toBeNull();
+    expect(defaultNetworkId([])).toBeNull();
+    expect(defaultNetworkId([net("random", 5, 0)])).toBeNull();
+    expect(defaultNetworkId([net("starter", 1, 5_000_000), net("random", 9, 0)])).toBe("starter");
+    expect(defaultNetworkId([net("starter", 1, 5_000_000), net("mine", 3, 20_000), net("older", 2, 10)])).toBe("mine");
   });
 });
 

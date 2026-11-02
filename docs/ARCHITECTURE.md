@@ -123,6 +123,8 @@ useMatches(), useMatch(id), useGames(opts?), useSetting<T>(key, fallback): [T, (
 exportBackup(opts?: { includeDatasets?: boolean; includeGames?: boolean }): Promise<Blob>;
 importBackup(file: Blob): Promise<Record<StoreName, number>>;
 exportEngineFile(id): Promise<Blob>;   importEngineFile(file: Blob): Promise<string /* new id */>;
+// importEngineFile reuses the library's network when it has the same id and identical CBNN bytes;
+// otherwise the file's network is stored under a new id.
 requestPersistentStorage(): Promise<boolean>;  storageEstimate(): Promise<{ usage: number; quota: number; persisted: boolean }>;
 ensureSeeded(): Promise<void>;         // first-run starters (idempotent; settings keys "seeded.v1" and "seeded.network.v1")
 // "seeded.v1": Blocky (blocks), Classic (eval), Sprout (scratch). "seeded.network.v1": the starter
@@ -130,6 +132,11 @@ ensureSeeded(): Promise<void>;         // first-run starters (idempotent; settin
 // SCReLU, trained on 5M self-play positions of the stock HCE) and the NNUE engine "Neuron"
 // (id STARTER_NNUE_ENGINE_ID) that uses it. Fixed ids: seeding again only re-adds missing records.
 // If the download fails, the network flag stays unset and the next start retries.
+// The two parts run independently. whenSeeded() resolves once the starter ENGINES exist (it does not
+// wait for the download); ensureSeeded() resolves after both parts (download timeout
+// STARTER_NETWORK_TIMEOUT_MS = 30 s) and rejects only if the starter engines cannot be created.
+// A call while a part is running schedules one more pass of it (so Delete all data / Restore
+// starter engines during the first-run download still re-create everything).
 ```
 
 `@/storage` must be importable from workers (no React in `db.ts`/`repos.ts`; hooks live in `hooks.ts`
@@ -226,19 +233,25 @@ randomPlies(n: number, seed: number, startFen?: string): string[];
             arrows?: {from,to,color?}[] squareHighlights?: Record<string,string> showCoordinates? animationMs? className? />
 <BoardEditor fen onChange(fen) />          <MiniBoard fen orientation? lastMove? size? />
 <MoveList san currentPly? onSelectPly?(ply) startPly? />     <Clock ms running side label? />
-<EvalBar cp mate orientation? />           // White POV
+<EvalBar cp mate orientation? fen? />      // White POV; with `fen`, a checkmate/stalemate shows 1-0 / 0-1 / ½-½
 <LineChart series={[{ name, color, points: {x,y}[] }]} xLabel? yLabel? height? logY? formatX? formatY? />
 <Modal open title onClose footer? width?>   <Tabs tabs active onChange />   <ProgressBar value max label? />
-<LimitsEditor value={{ limits, timeControl }} onChange allowClock? compact? />
+<LimitsEditor value={{ limits, timeControl }} onChange allowClock? compact? minBaseMs? />   // minBaseMs default 1000
+<ClockTimeField label valueMs onCommit minMs? maxMs? compact? />   // "5", "1:30", "20 s", "1m 30s"…
 <EnginePicker value onChange filter? allowNone? placeholder? />   <KindBadge kind />   <Spinner />  <EmptyState title action? />
 ```
+
+Helpers: `formatClockTime`, `parseClockTime`, `parseSecondsText`, `formatTimeControl` ("1:20+0"),
+`describeTimeControl` (`src/components/timeFormat.ts`), `finalPosition(fen)` (checkmate / stalemate or null).
 
 ### `@/blocks` (WP-BLOCKS)
 
 ```ts
 const DEFAULT_WORKSPACE: object;                    // starter HCE workspace (Blockly JSON)
 function generateEvalSource(workspace: object): { code: string; errors: string[]; warnings: string[] };  // headless
-function BlocksEditor(props: { workspace: object; onChange(workspace: object, code: string): void; readOnly?: boolean }): JSX.Element;
+function BlocksEditor(props: { workspace: object; onChange(workspace: object, code: string): void; readOnly?: boolean;
+                               ref?: Ref<BlocksEditorHandle> }): JSX.Element;
+interface BlocksEditorHandle { flush(): void }   // report the newest edit to onChange now (call before save / build)
 ```
 
 ### `@/nnue` (WP-TRAINER)
@@ -266,6 +279,8 @@ interface CodeEditorProps {
   onSave?(): void;                             // Ctrl/Cmd+S (prevents the browser's save dialog)
   revealLine?: { line: number; column?: number; nonce: number };   // scroll to + select; bump nonce to repeat
   completions?: boolean;                       // engine-API autocompletion (default true for assemblyscript)
+  onReadOnlyEdit?(): void;                     // the user tried to type into a read-only editor
+  importBase?: string;                         // relative path to the template modules ("../" inside lib/)
   className?: string; "aria-label"?: string;
 }
 CodeEditor(props): JSX.Element                 // fills its container (give the parent a height)
@@ -276,7 +291,8 @@ ApiReference(props: { onInsert?(snippet: string, entry: ApiEntry): void; modules
 interface FileTreeProps { files: string[]; active: string | null; entry?: string; readOnly?: boolean;
   onSelect(path: string): void; onCreate?(path: string): void; onRename?(from: string, to: string): void;
   onDelete?(path: string): void; onSetEntry?(path: string): void;
-  dirty?: ReadonlySet<string>; errorCounts?: Record<string, number>; className?: string }
+  dirty?: ReadonlySet<string>; errorCounts?: Record<string, number>; className?: string;
+  deleteWarning?(path: string): string | null }   // extra text for the delete confirmation (e.g. importers)
 FileTree(props: FileTreeProps): JSX.Element
 diagnosticsForFile(diags: CompileDiagnostic[], file: string): CodeEditorDiagnostic[]   // helper
 ```
@@ -366,15 +382,27 @@ playEngineGame(opts: PlayEngineGameOptions): Promise<PlayedGame>   // one engine
 
 ### `@/app/preferences` (architect)
 
-Theme (`getThemePreference`, `setThemePreference`, `applyTheme`), board appearance
+Theme (`getThemePreference`, `setThemePreference`, `applyTheme`, `useThemePreference()`; `watchSystemTheme()`
+also follows changes made in other tabs), board appearance
 (`useBoardPreferences`, `useBoardProps()` → spread into every `<Chessboard>`, `BOARD_THEMES`),
 engine defaults (`useDefaultHashMb`, `getDefaultHashMb`) and the background-work budget
 (`useMaxWorkers`, `getMaxWorkers`, `defaultMaxWorkers()`): the default and upper bound for self-play
 workers, simultaneous arena games and trainer threads.
 
+### `@/app/toast` (architect)
+
+`toast(message, { kind?, detail?, timeoutMs? }): number` (an identical auto-dismissing toast that is
+already showing is merged and counted instead), `dismissToast(id)`, `dismissAllToasts()`. Default
+timeouts `TOAST_TIMEOUTS`: info/success 4 s, warn 6 s, error 9 s; `timeoutMs: 0` keeps a toast until dismissed.
+At most 3 toasts show (2 at ≤600 px); older ones fold into a "+N more" pill.
+
+`@/utils/localData`: `clearLocalAppData()` removes every `cb.*` localStorage key except `cb.theme`
+(Delete all data calls it).
+
 ## 6. UI
 
-Routes (hash router in `src/app/router.ts`):
+Routes (hash router in `src/app/router.ts`; the route table, default page titles and `resolveRoute()`
+are in `src/app/routes.ts`):
 
 | Route | Page |
 |---|---|

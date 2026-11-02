@@ -8,7 +8,7 @@ import { Icon, ProgressBar } from "@/components";
 import { useDatasets, useEngines, useNetworks, useTrainingRuns } from "@/storage";
 import { training, useActiveRunIds, useLiveRun } from "@/training";
 import { ACTIVATION_NAMES } from "@/nnue/format";
-import type { TrainingRunRecord } from "@/types";
+import type { NetworkRecord, TrainingRunRecord } from "@/types";
 import { formatCount } from "@/utils/format";
 import { importDatasetFromFile, importNetworkFromFile, playAgainstNetwork } from "../actions";
 import { PHASE_LABELS, countOf, cycleText, errorMessage, formatInt, formatLoss, isActiveStatus, latestValLoss, progressFraction, wasInterrupted } from "../model/format";
@@ -92,6 +92,7 @@ export function OverviewPage() {
         <>
           {isNewUser && (
             <GettingStarted
+              starter={(networks ?? []).find((n) => n.builtin) ?? null}
               hasDataset={(datasets?.length ?? 0) > 0}
               onGenerate={() => setGenerateOpen(true)}
               onPlay={() => void playNewest()}
@@ -286,7 +287,20 @@ function ActiveRunRow({ run, activeHere }: { run: TrainingRunRecord; activeHere:
   );
 }
 
-function GettingStarted({ hasDataset, onGenerate, onPlay, canPlay }: { hasDataset: boolean; onGenerate: () => void; onPlay: () => void; canPlay: boolean }) {
+function GettingStarted({
+  starter,
+  hasDataset,
+  onGenerate,
+  onPlay,
+  canPlay,
+}: {
+  /** The bundled, already trained starter network (Neuron plays it), if it is there. */
+  starter: NetworkRecord | null;
+  hasDataset: boolean;
+  onGenerate: () => void;
+  onPlay: () => void;
+  canPlay: boolean;
+}) {
   const steps: Array<{ n: number; title: string; text: string; done: boolean; action: ReactNode }> = [
     {
       n: 1,
@@ -327,6 +341,12 @@ function GettingStarted({ hasDataset, onGenerate, onPlay, canPlay }: { hasDatase
       <div className="lab-guide-head">
         <h2 id="lab-guide-title">Your first network in three steps</h2>
         <p className="muted">Networks need lots of examples: expect a few thousand games (a few hundred thousand positions) before one plays as well as a simple material count. Everything is saved, so you can stop and come back at any time.</p>
+        {starter && (
+          <p className="muted lab-guide-starter">
+            Don't want to start from zero? The <Link to={`/lab/networks/${encodeURIComponent(starter.id)}`}>{starter.name}</Link> is already trained — the
+            starter engine Neuron plays with it. Open it to continue training it or to widen it.
+          </p>
+        )}
       </div>
       <ol className="lab-guide-steps">
         {steps.map((s) => (

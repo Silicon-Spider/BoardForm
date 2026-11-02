@@ -251,8 +251,13 @@ export function buildTrainingSet(chunks: readonly (ArrayBufferLike | ArrayBuffer
 export interface ChunkSource {
   chunkCount(datasetId: string): Promise<number>;
   iterateChunks(datasetId: string): AsyncIterable<DatasetChunkRecord>;
-  /** Total positions of a dataset if cheaply known (used to size the buffer up front). */
+  /**
+   * Total positions of a dataset if cheaply known (used to size the buffer up front); null when the
+   * dataset does not exist.
+   */
   positions?(datasetId: string): Promise<number | null>;
+  /** The dataset's name for messages (null when it does not exist), if the source knows names. */
+  name?(datasetId: string): Promise<string | null>;
 }
 
 /** The IndexedDB-backed source (lazy import keeps storage out of Node tests that don't need it). */
@@ -265,7 +270,19 @@ export async function indexedDbChunkSource(): Promise<ChunkSource> {
       const rec = await datasetsRepo.get(id);
       return rec ? rec.positions : null;
     },
+    name: async (id) => (await datasetsRepo.get(id))?.name ?? null,
   };
+}
+
+/**
+ * The warning for a dataset that adds no positions. Messages show the dataset's name, never its
+ * internal id; `exists` is null when the source cannot tell a missing dataset from an empty one.
+ */
+export function emptyDatasetWarning(name: string | null, exists: boolean | null): string {
+  const what = name ? `The dataset “${name}”` : "One of the selected datasets";
+  if (exists === false) return `${what} no longer exists, so it was left out.`;
+  if (exists === true) return `${what} has no positions yet, so it adds nothing to the training data.`;
+  return `${what} has no positions (or no longer exists), so it adds nothing to the training data.`;
 }
 
 export interface LoadProgress {
@@ -306,13 +323,27 @@ export async function loadTrainingSet(opts: LoadOptions): Promise<TrainingSet> {
   let expected = 0;
   let chunksTotal = 0;
   const warnings: string[] = [];
+  // Names are only looked up for messages (rarely needed), once per dataset.
+  const names = new Map<string, Promise<string | null>>();
+  const nameOf = (id: string): Promise<string | null> => {
+    let name = names.get(id);
+    if (!name) {
+      name = source?.name ? source.name(id).catch(() => null) : Promise.resolve(null);
+      names.set(id, name);
+    }
+    return name;
+  };
   for (const id of ids) {
     const chunks = await (source as ChunkSource).chunkCount(id);
     counts.push(chunks);
     chunksTotal += chunks;
     const known = source?.positions ? await source.positions(id) : null;
     expected += known ?? chunks * POSITIONS_PER_CHUNK;
-    if (chunks === 0) warnings.push(`Dataset ${id} has no positions (or does not exist).`);
+    if (chunks === 0) {
+      // A source that reports positions returns null for a dataset that does not exist.
+      const exists = source?.positions ? known !== null : null;
+      warnings.push(emptyDatasetWarning(await nameOf(id), exists));
+    }
   }
   for (const c of opts.data ?? []) expected += Math.floor(c.byteLength / PACKED_SIZE);
 
@@ -325,7 +356,11 @@ export async function loadTrainingSet(opts: LoadOptions): Promise<TrainingSet> {
       const bytes = chunkBytes(chunk.data);
       const whole = Math.floor(bytes.length / PACKED_SIZE);
       if (chunk.count !== whole) {
-        warnings.push(`Chunk ${chunk.id} declares ${chunk.count} positions but holds ${whole}; using ${Math.min(chunk.count, whole)}.`);
+        const name = await nameOf(id);
+        warnings.push(
+          `Part ${chunk.index + 1} of ${name ? `the dataset “${name}”` : "a selected dataset"} declares ${chunk.count} positions ` +
+            `but holds ${whole}; using ${Math.min(chunk.count, whole)}.`,
+        );
       }
       builder.add(bytes, Math.min(chunk.count, whole));
       chunksRead++;

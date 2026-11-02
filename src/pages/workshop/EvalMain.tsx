@@ -9,6 +9,7 @@ import { CodePane, type CodePaneHandle } from "./CodePane";
 import type { EngineDraft } from "./draft";
 import { NetworkBar } from "./NetworkPicker";
 import { filePatch } from "./records";
+import { ShortcutsButton } from "./Shortcuts";
 import type { RevealTarget } from "./types";
 
 /** The eval.ts a fresh engine of this kind starts with. */
@@ -52,6 +53,7 @@ export function EvalMain({
           </button>
         </span>
         <span className="spacer" />
+        <ShortcutsButton />
         <button type="button" className="btn btn-sm btn-ghost" onClick={onReset} disabled={!modified} title="Replace eval.ts with the template's version">
           <Icon name="reset" size={14} />
           <span className="workshop-hide-narrow">Reset eval.ts to the template</span>
@@ -62,6 +64,7 @@ export function EvalMain({
         value={value}
         onChange={(text) => draft.edit(filePatch(draft.view, "eval.ts", text))}
         onSave={() => void draft.flush()}
+        importBase="./"
         diagnostics={diagnosticsForFile(diagnostics, "eval.ts")}
         revealLine={reveal && reveal.target === "main:eval.ts" ? reveal.reveal : undefined}
         aria-label="eval.ts"

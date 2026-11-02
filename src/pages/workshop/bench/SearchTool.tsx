@@ -7,7 +7,7 @@ import { useSetting } from "@/storage";
 import type { EngineLimits, SearchInfo, SearchLimits, SearchResult } from "@/types";
 import { formatCount, formatDuration } from "@/utils/format";
 import { formatInfoScore, numberedLine, sideOf } from "../format";
-import { engineErrorText, type JobRunner } from "./runner";
+import { engineErrorText, runtimeErrorHint, type JobRunner } from "./runner";
 
 const MAX_ROWS = 300;
 const DEFAULT_LIMITS: EngineLimits = { movetimeMs: 2000 };
@@ -167,7 +167,11 @@ export function SearchTool({
             </div>
           ) : null}
           {best && outcome.legalMoves > 0 && bestSan === null && <div className="callout danger small">{best} is not a legal move in this position.</div>}
-          {r.stopReason === "error" && <div className="callout danger small">The engine crashed during the search: {r.error ?? "unknown error"}. It was restarted.</div>}
+          {r.stopReason === "error" && (
+            <div className="callout danger small">
+              The engine crashed during the search: {r.error ?? "unknown error"}. It was restarted. {runtimeErrorHint(r.error ?? "")}
+            </div>
+          )}
           {r.stopReason === "timeout" && <div className="callout warn small">The search ran past its time limit and the host had to stop it.</div>}
           {r.stopReason === "stopped" && <p className="small muted">Stopped — showing the best move found so far.</p>}
         </div>

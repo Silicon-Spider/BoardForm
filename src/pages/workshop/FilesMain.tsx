@@ -8,9 +8,10 @@ import { toast } from "@/app/toast";
 import type { CompileDiagnostic, EngineRecord } from "@/types";
 import { CodePane, type CodePaneHandle } from "./CodePane";
 import type { EngineDraft } from "./draft";
-import { closeTab, newFileContents, openTab, pruneTabs, renameInFiles, renameTab, sortPaths, withExtension, withoutFile } from "./files";
+import { closeTab, importSpecifier, importersOf, newFileContents, openTab, pruneTabs, renameTab, renameWithImports, sortPaths, withExtension, withoutFile } from "./files";
 import { entryOf, filePatch } from "./records";
 import type { RevealTarget } from "./types";
+import { ShortcutsButton } from "./Shortcuts";
 import { MenuButton } from "./ui";
 
 interface FilesMainProps {
@@ -56,6 +57,19 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
     });
   }, [active, paths]);
 
+  // The tab strip scrolls sideways when the tabs do not fit (always on a phone): keep the open
+  // file's tab in sight, so it is clear which file the editor shows.
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabStripRef.current;
+    const tab = strip?.querySelector<HTMLElement>(".workshop-filetab.active");
+    if (!strip || !tab) return;
+    const s = strip.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    if (t.left < s.left) strip.scrollLeft -= s.left - t.left;
+    else if (t.right > s.right) strip.scrollLeft += Math.min(t.right - s.right, t.left - s.left);
+  }, [active, tabs, narrow]);
+
   const errorCounts = useMemo(() => {
     const out: Record<string, number> = {};
     for (const d of diagnostics) if (d.severity === "error" && d.file && d.file in files) out[d.file] = (out[d.file] ?? 0) + 1;
@@ -78,7 +92,8 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
     const path = withExtension(normalizeFilePath(raw));
     const problem = validateFilePath(path, paths);
     if (problem) return problem;
-    draft.edit({ files: { ...(draft.view.files ?? {}), [path]: newFileContents(path) } });
+    const current = draft.view.files ?? {};
+    draft.edit({ files: { ...current, [path]: newFileContents(path, Object.keys(current), entryOf(draft.view)) } });
     open(path);
     return null;
   };
@@ -89,13 +104,27 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
     const problem = validateFilePath(to, paths, { current: from });
     if (problem) return problem;
     const current = draft.view;
-    const patch: Partial<EngineRecord> = { files: renameInFiles(current.files ?? {}, from, to) };
+    // Imports of the renamed file are rewritten to the new path, so the engine keeps building.
+    const renamed = renameWithImports(current.files ?? {}, from, to);
+    const patch: Partial<EngineRecord> = { files: renamed.files };
     if (entryOf(current) === from) patch.entry = to;
     draft.edit(patch);
     setTabs((t) => renameTab(t, from, to));
     if (active === from) onOpenFile(to);
-    toast(`Renamed to ${to}`, { kind: "success", detail: "Update the imports that use the old name." });
+    const updated = renamed.updated;
+    toast(`Renamed to ${to}`, {
+      kind: "success",
+      detail: updated.length === 0 ? undefined : `Updated the import${updated.length === 1 ? "" : "s"} in ${updated.join(", ")}.`,
+    });
     return null;
+  };
+
+  /** "main.ts imports it: …" for the delete confirmation, or "" when no file imports `path`. */
+  const importWarning = (path: string): string => {
+    const importers = importersOf(draft.view.files ?? {}, path);
+    if (importers.length === 0) return "";
+    const who = importers.length === 1 ? `${importers[0]} imports it` : `${importers.join(", ")} import it`;
+    return ` ${who}: remove ${importers.length === 1 ? "that import" : "those imports"} too, or the engine won't build.`;
   };
 
   /** Deletes a file (`confirmed`: the file tree already asked). */
@@ -105,7 +134,12 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
       return;
     }
     if (!confirmed) {
-      const ok = await confirm({ title: `Delete ${path}?`, message: `${path} will be removed from this engine. This can't be undone.`, confirmLabel: "Delete file", danger: true });
+      const ok = await confirm({
+        title: `Delete ${path}?`,
+        message: `${path} will be removed from this engine. This can't be undone.${importWarning(path)}`,
+        confirmLabel: "Delete file",
+        danger: true,
+      });
       if (!ok) return;
     }
     draft.edit({ files: withoutFile(draft.view.files ?? {}, path) });
@@ -147,7 +181,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
               type="button"
               className="btn btn-primary"
               onClick={() => {
-                draft.edit({ files: { "main.ts": newFileContents("main.ts") }, entry: "main.ts" });
+                draft.edit({ files: { "main.ts": newFileContents("main.ts", [], "main.ts") }, entry: "main.ts" });
                 onOpenFile("main.ts");
               }}
             >
@@ -189,6 +223,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
           if (problem) toast("Could not rename the file", { kind: "error", detail: problem });
         }}
         onDelete={(p) => void remove(p, true)}
+        deleteWarning={(p) => importWarning(p).trim() || null}
         onSetEntry={setEntry}
         dirty={dirty}
         errorCounts={errorCounts}
@@ -217,7 +252,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
               <Icon name="copy" size={14} /> Files
             </button>
           )}
-          <div className="workshop-filetabs-scroll" role="tablist" aria-label="Open files">
+          <div ref={tabStripRef} className="workshop-filetabs-scroll" role="tablist" aria-label="Open files">
             {tabs.map((t) => {
               const name = t.split("/").pop() ?? t;
               const errs = errorCounts[t] ?? 0;
@@ -245,6 +280,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
               );
             })}
           </div>
+          <ShortcutsButton />
           {active && (
             <MenuButton
               label={
@@ -285,6 +321,7 @@ export function FilesMain({ view, saved, draft, diagnostics, reveal, editorRef, 
             ref={editorRef}
             documentId={active}
             completions={view.kind === "full"}
+            importBase={view.kind === "full" ? importSpecifier(active, "x.ts").slice(0, -1) : undefined}
             value={files[active] ?? ""}
             onChange={(text) => draft.edit(filePatch(draft.view, active, text))}
             onSave={() => void draft.flush()}

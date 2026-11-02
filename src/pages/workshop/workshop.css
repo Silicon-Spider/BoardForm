@@ -180,7 +180,7 @@ body.workshop-resizing * {
 }
 .workshop-pill--accent {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .workshop-pill--neutral {
   background: var(--surface-3);
@@ -407,6 +407,21 @@ body.workshop-resizing * {
   inset: 0;
   min-height: 0;
 }
+/* Blockly 13 puts its context menus, dropdowns and tooltips inside the editor: let them reach
+   over the side panel instead of being cut off at the canvas edge (the canvas SVG still clips
+   the blocks themselves). The editor's stacking level lifts them above the side panel's content
+   but stays under the splitter (z-index 8), which keeps its full grab area. */
+.workshop-blocks > .blocks-editor,
+.workshop-blocks .injectionDiv {
+  overflow: visible;
+}
+.workshop-blocks > .blocks-editor {
+  z-index: 7;
+}
+/* While a menu or dropdown is open (Blockly empties them when they close), above the splitter too. */
+.workshop-blocks:has(.blocklyWidgetDiv:not(:empty), .blocklyDropDownContent:not(:empty)) > .blocks-editor {
+  z-index: 9;
+}
 
 /* ---------- eval / nnue ---------- */
 .workshop-eval {
@@ -562,7 +577,7 @@ body.workshop-resizing * {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--accent);
+  color: var(--accent-ink);
   background: var(--accent-soft);
   border-radius: 999px;
   padding: 0 6px;
@@ -682,7 +697,7 @@ body.workshop-resizing * {
 }
 .workshop-chip.required {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .workshop-chip.abi {
   background: var(--ok-soft);
@@ -898,6 +913,82 @@ button.workshop-diag:hover {
   flex: none;
   margin-top: 2px;
   color: var(--accent);
+}
+/* The user tried to type into the read-only editor below: say so, with a short shake. */
+.workshop-source-note--nudge {
+  color: var(--text);
+  background: var(--warn-soft);
+  animation: workshop-nudge 0.36s ease;
+}
+.workshop-source-note--nudge .cb-icon {
+  color: var(--warn);
+}
+.workshop-source-note-headline {
+  font-weight: 600;
+}
+@keyframes workshop-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workshop-source-note--nudge {
+    animation: none;
+  }
+}
+
+/* Keyboard shortcuts (Shortcuts.tsx): the button sits in the file bar / tab strip. */
+.workshop-shortcuts-btn {
+  flex: none;
+  align-self: center;
+  color: var(--text-dim);
+}
+.workshop-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.workshop-shortcuts-list {
+  margin: 0;
+}
+.workshop-shortcuts-row {
+  display: grid;
+  grid-template-columns: 11.5rem 1fr;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.workshop-shortcuts-row:last-child {
+  border-bottom: none;
+}
+.workshop-shortcuts-row dt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  align-items: baseline;
+}
+.workshop-shortcuts-combo {
+  white-space: nowrap;
+}
+.workshop-shortcuts-row dd {
+  margin: 0;
+  color: var(--text-dim);
+}
+.workshop-shortcuts-combo kbd {
+  margin: 0 2px;
+}
+@media (max-width: 480px) {
+  .workshop-shortcuts-row {
+    grid-template-columns: 1fr;
+  }
 }
 .sr-only-workshop {
   position: absolute;
@@ -1136,6 +1227,18 @@ button.workshop-diag:hover {
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.01em;
+}
+/* "+0.01 pawns": the unit stays on the number's line. */
+.workshop-eval-headline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.workshop-eval-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
 }
 .workshop-trace-label {
   white-space: normal !important;

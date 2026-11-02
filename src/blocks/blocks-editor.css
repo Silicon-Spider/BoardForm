@@ -212,6 +212,27 @@
 .blocks-editor .blocklyToolboxSelected .blocklyToolboxCategoryLabel {
   color: #fff;
 }
+/* Phones: a slimmer toolbox leaves the canvas more room (Blockly measures the toolbox's width). */
+@media (max-width: 560px) {
+  .blocks-editor .blocklyToolbox {
+    min-width: 0;
+    padding: 6px 0;
+  }
+  .blocks-editor .blocklyToolboxCategoryContainer {
+    margin: 1px 4px;
+  }
+  .blocks-editor .blocklyToolboxCategory {
+    padding: 0 6px 0 4px;
+  }
+  .blocks-editor .blocklyToolboxCategoryLabel {
+    font-size: 12px;
+    padding: 0 2px;
+  }
+  .blocks-editor-empty {
+    left: 132px;
+    padding: 12px;
+  }
+}
 .blocks-editor .blocklyTreeSeparator {
   border-bottom: 1px solid var(--border);
   margin: 8px 12px;
@@ -322,6 +343,58 @@
 .blocklyToast {
   font-family: var(--font-sans);
   border-radius: 8px;
+}
+
+/* Blockly's own <dialog> (e.g. "Delete all 84 blocks?", "New variable name:") in the app's look. */
+.blocklyDialog {
+  min-width: min(340px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 20px 20px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  font: 14px/1.5 var(--font-sans);
+}
+.blocklyDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.blocklyDialogPrompt {
+  font-weight: 600;
+}
+.blocklyDialogInput {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text);
+  font: inherit;
+}
+.blocklyDialogButtonRow {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.blocklyDialogButtonRow button {
+  height: 34px;
+  min-width: 80px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text);
+  font: 550 13.5px var(--font-sans);
+  cursor: pointer;
+}
+.blocklyDialogButtonRow .blocklyDialogConfirmButton {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.blocklyDialogButtonRow button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ---------- Piece-square-table field ---------- */

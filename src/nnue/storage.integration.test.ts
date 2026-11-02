@@ -80,6 +80,6 @@ describe("training data from IndexedDB (@/storage/repos)", () => {
     expect(final.finished).toBe(true);
     expect(final.positionsSeen).toBe(2 * 5_400);
     expect(logs.some((l) => l.startsWith("Loaded 6,000 positions (2 datasets)"))).toBe(true);
-    expect(logs.some((l) => /missing-dataset has no positions/.test(l))).toBe(true);
+    expect(logs).toContain("Warning: One of the selected datasets no longer exists, so it was left out.");
   });
 });

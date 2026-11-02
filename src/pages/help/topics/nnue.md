@@ -80,7 +80,7 @@ A run's page shows what it is doing — self-play, training or evaluating — an
 
 Training and dataset generation are not tied to the Lab page: switch to another page — play a game, run a match — and they keep going. The header shows how many jobs are running; click it to see their progress.
 
-Browsers can't run anything once the tab is closed, so runs save checkpoints to the database as they go. **Pause** saves a checkpoint and stops the workers; **Stop** ends the run now and keeps the best network so far. Runs with **Keep training when I reopen the app** switched on start again by themselves when you reopen BoardForm; others are marked as interrupted and wait for you. If you open the app in several tabs, only one of them runs a given job.
+Browsers can't run anything once the tab is closed, so runs save checkpoints to the database as they go (self-play games at least every 10 seconds, training checkpoints at least every 20); a run cut off by a closed tab repeats at most that much work. **Pause** saves a checkpoint and stops the workers; **Stop** ends the run now and keeps the best network so far. Runs with **Keep training when I reopen the app** switched on start again by themselves when you reopen BoardForm; others are marked as interrupted and wait for you. If you open the app in several tabs, only one of them runs a given job.
 
 How many workers may run at once — self-play workers, Arena games played at the same time and trainer threads — is set under **Background workers** in [Settings](#/settings?section=engines).
 

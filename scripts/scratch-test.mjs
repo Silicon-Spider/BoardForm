@@ -636,8 +636,11 @@ async function testMinimal() {
       if (last) {
         totalNodes += last.nodes;
         totalMs += last.timeMs;
-        check(`best move == first PV move (${label})`, last.pv.split(" ")[0] === res.move || kind !== "depth", `${res.move} vs ${last.pv}`);
-        check(`depths increase 1,2,3.. (${label})`, res.infos.every((inf, k) => inf.depth === k + 1));
+        check(`best move == first PV move (${label})`, last.pv.split(" ")[0] === res.move, `${res.move} vs ${last.pv}`);
+        // A search stopped by a limit ends with one more report (total nodes and time) at the
+        // depth of the last finished iteration.
+        const finalRepeat = (inf, k) => k === res.infos.length - 1 && kind !== "depth" && inf.depth === Math.max(k, 1);
+        check(`depths increase 1,2,3.. (${label})`, res.infos.every((inf, k) => inf.depth === k + 1 || finalRepeat(inf, k)), JSON.stringify(res.infos.map((x) => x.depth)));
       }
       if (kind === "depth") {
         const mateFound = last && last.mate !== 0;

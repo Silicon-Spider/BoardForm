@@ -119,7 +119,7 @@
   padding: 0 6px;
   border-radius: 999px;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;

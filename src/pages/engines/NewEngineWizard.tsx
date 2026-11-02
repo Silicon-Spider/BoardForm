@@ -13,6 +13,7 @@ import { NetworkChoice } from "./NetworkChoice";
 import {
   MAX_NAME_LENGTH,
   createEngineRecord,
+  defaultNetworkId,
   isHexColor,
   pickDefaultColor,
   suggestName,
@@ -134,7 +135,8 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
   const [description, setDescription] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
   const [scratchVariant, setScratchVariant] = useState<ScratchVariant>("minimal");
-  const [networkId, setNetworkId] = useState<string | null>(initialNetworkId);
+  // undefined = not chosen yet: an NNUE engine then gets the default network (defaultNetworkId).
+  const [chosenNetworkId, setNetworkId] = useState<string | null | undefined>(initialNetworkId ?? undefined);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [wasm, setWasm] = useState<WasmUploadState>({ status: "empty" });
   const [busy, setBusy] = useState(false);
@@ -160,6 +162,10 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
   const info = APPROACHES.find((a) => a.id === approach) ?? null;
   const takenNames = useMemo(() => (engines ?? []).map((e) => e.name), [engines]);
   const source = approach === "copy" && sourceId ? (engines?.find((e) => e.id === sourceId) ?? null) : null;
+  // An NNUE engine without a network only plays its fallback evaluation, so until the user picks
+  // one (or "None") it gets the newest trained network — the starter network on a fresh install.
+  // An uploaded module keeps "None": it may well have an evaluation of its own.
+  const networkId = chosenNetworkId !== undefined ? chosenNetworkId : approach === "nnue" ? defaultNetworkId(networks) : null;
   const network = networkId && networks ? (networks.find((n) => n.id === networkId) ?? null) : null;
   // A preselected network that no longer exists counts as "none".
   const effectiveNetworkId = networks && networkId && !network ? null : networkId;
@@ -190,7 +196,9 @@ export function NewEngineWizard({ initialKind, initialNetworkId, onClose, onCrea
         : trimmedName === ""
           ? NAME_MISSING
           : null;
-  const canCreate = step === "details" && approach !== null && missingRequirement === null && engines !== undefined && !busy;
+  // (An NNUE engine waits for the network list, so its default network is known.)
+  const canCreate =
+    step === "details" && approach !== null && missingRequirement === null && engines !== undefined && (approach !== "nnue" || networks !== undefined) && !busy;
 
   const chooseApproach = (id: Approach) => {
     setApproach(id);

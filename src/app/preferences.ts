@@ -1,13 +1,16 @@
 // User preferences shared by every page. The Settings page edits them; boards, engines and
 // background services read them. Stored in the IndexedDB `settings` store (via useSetting), except
 // the colour theme, which lives in localStorage so it can be applied before the first paint.
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { settingsRepo, useSetting } from "@/storage";
 
 // --- colour theme (dark / light / follow the system) ------------------------------------------
 
 export type ThemePreference = "dark" | "light" | "system";
-const THEME_STORAGE_KEY = "cb.theme";
+/** localStorage key of the theme. It survives "Delete all data" (see src/utils/localData.ts). */
+export const THEME_STORAGE_KEY = "cb.theme";
+/** Browser-chrome colour (<meta name="theme-color">) per resolved theme: the nav bar's surface. */
+const THEME_COLORS = { dark: "#161a20", light: "#ffffff" } as const;
 const systemDark = () => typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
 
 export function getThemePreference(): ThemePreference {
@@ -23,6 +26,19 @@ export function getThemePreference(): ThemePreference {
 export function applyTheme(pref: ThemePreference = getThemePreference()): void {
   const resolved = pref === "system" ? (systemDark() ? "dark" : "light") : pref;
   document.documentElement.dataset.theme = resolved;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[resolved]);
+}
+
+// Components showing the preference (Settings → Appearance) re-render when it changes, in this
+// tab or in another one.
+const themeListeners = new Set<() => void>();
+const notifyTheme = () => themeListeners.forEach((l) => l());
+
+function subscribeTheme(listener: () => void): () => void {
+  themeListeners.add(listener);
+  return () => {
+    themeListeners.delete(listener);
+  };
 }
 
 export function setThemePreference(pref: ThemePreference): void {
@@ -32,13 +48,34 @@ export function setThemePreference(pref: ThemePreference): void {
     // Private mode etc.: the theme still applies for this session.
   }
   applyTheme(pref);
+  notifyTheme();
 }
 
-/** Keeps a "system" theme in sync with the OS setting. Call once at start-up. */
+/** The saved theme preference; updates when it changes in this tab or another tab. */
+export function useThemePreference(): ThemePreference {
+  return useSyncExternalStore(subscribeTheme, getThemePreference, () => "dark");
+}
+
+let watching = false;
+
+/**
+ * Keeps the applied theme in sync with the OS setting (for "system") and with other open tabs
+ * (localStorage fires a "storage" event in every other tab of the origin when one tab changes the
+ * theme). Call once at start-up; later calls do nothing.
+ */
 export function watchSystemTheme(): void {
-  if (typeof matchMedia !== "function") return;
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (getThemePreference() === "system") applyTheme("system");
+  if (watching || typeof window === "undefined") return;
+  watching = true;
+  if (typeof matchMedia === "function") {
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (getThemePreference() === "system") applyTheme("system");
+    });
+  }
+  window.addEventListener("storage", (e) => {
+    // key === null: the other tab cleared all of localStorage (the theme falls back to dark).
+    if (e.key !== THEME_STORAGE_KEY && e.key !== null) return;
+    applyTheme();
+    notifyTheme();
   });
 }
 

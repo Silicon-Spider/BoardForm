@@ -101,7 +101,7 @@ export function BoardArea(props: BoardAreaProps) {
     <div className="play-board-col">
       {top}
       <div className="play-board-row">
-        {showEval && <EvalBar cp={evalScore?.cp ?? null} mate={evalScore?.mate ?? null} orientation={orientation} className="play-evalbar" />}
+        {showEval && <EvalBar cp={evalScore?.cp ?? null} mate={evalScore?.mate ?? null} fen={fen} orientation={orientation} className="play-evalbar" />}
         <div className="play-board">
           <Chessboard
             {...boardProps}

@@ -28,7 +28,16 @@ vi.mock("./persist", () => ({
 
 import { listQuery } from "./cache";
 import { clearAllData, enginesRepo, networksRepo, settingsRepo } from "./repos";
-import { NETWORK_SEED_FLAG_KEY, SEED_FLAG_KEY, STARTER_NETWORK_ID, STARTER_NNUE_ENGINE_ID, ensureSeeded } from "./seed";
+import { exportBackup, importBackup } from "./backup";
+import {
+  NETWORK_SEED_FLAG_KEY,
+  SEED_FLAG_KEY,
+  STARTER_NETWORK_ID,
+  STARTER_NETWORK_TIMEOUT_MS,
+  STARTER_NNUE_ENGINE_ID,
+  ensureSeeded,
+  whenSeeded,
+} from "./seed";
 import { resetStorage, waitFor } from "./test-utils";
 
 beforeEach(async () => {
@@ -213,8 +222,10 @@ describe("ensureSeeded: the starter network", () => {
     expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(false);
 
     const fetchMock = serve();
+    vi.spyOn(Date, "now").mockReturnValue(Date.now() + 86_400_000); // the next start, a day later
     await ensureSeeded();
-    expect((await enginesRepo.list()).map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    // Added later, Neuron is the newest engine: listed first (newest-updated first).
+    expect((await enginesRepo.list()).map((e) => e.name)).toEqual(["Neuron", "Blocky", "Classic", "Sprout"]);
     expect(mocks.generateEvalSource).toHaveBeenCalledTimes(1); // the engines were not rebuilt
     await ensureSeeded();
     expect(fetchMock).toHaveBeenCalledTimes(1); // flag set: no more downloads
@@ -263,6 +274,177 @@ describe("ensureSeeded: the starter network", () => {
     vi.resetModules();
     const tabB = await import("./seed");
     await Promise.all([tabA.ensureSeeded(), tabB.ensureSeeded()]);
+    vi.resetModules();
+    const { enginesRepo: freshRepo } = await import("./repos");
+    expect((await freshRepo.list()).map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ensureSeeded: a slow starter-network download and data changing meanwhile", () => {
+  const netBytes = (): ArrayBuffer => {
+    const buf = readFileSync(resolve(__dirname, "../../public/networks/starter-hl128.nnue"));
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+  };
+  const names = async () => (await enginesRepo.list()).map((e) => e.name);
+  const nextTask = () => new Promise<void>((r) => setImmediate(r));
+
+  /** A download that only finishes on release(). `honourAbort: false` = a fetch that ignores the signal. */
+  function gatedDownload(honourAbort = true) {
+    let release!: () => void;
+    const opened = new Promise<void>((r) => (release = r));
+    const signals: AbortSignal[] = [];
+    const fetchMock = vi.fn(async (_url: URL | string, init?: RequestInit) => {
+      if (init?.signal) signals.push(init.signal);
+      await new Promise<void>((resolveOpen, reject) => {
+        void opened.then(resolveOpen);
+        if (honourAbort) init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      });
+      return new Response(netBytes(), { status: 200 });
+    });
+    vi.stubGlobal("location", { href: "http://app.test/#/engines" });
+    vi.stubGlobal("fetch", fetchMock);
+    return { fetchMock, release, signals };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not hold up whenSeeded (the engines list) while the network downloads; Neuron is listed last", async () => {
+    const { release } = gatedDownload();
+    let done = false;
+    const seeding = ensureSeeded().then(() => {
+      done = true;
+    });
+    await whenSeeded(); // would never resolve if it waited for the download
+    expect(await names()).toEqual(["Blocky", "Classic", "Sprout"]);
+    expect(done).toBe(false);
+
+    // The library is ready with the three engines and gets Neuron, at the end, once it arrives.
+    const q = listQuery("engines");
+    const off = q.subscribe(() => {});
+    await waitFor(() => q.getSnapshot().status === "ready");
+    release();
+    await seeding;
+    await waitFor(() => {
+      const s = q.getSnapshot();
+      return s.status === "ready" && s.data.length === 4;
+    });
+    const s = q.getSnapshot();
+    off();
+    expect(s.status === "ready" && s.data.map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(true);
+  });
+
+  for (const honourAbort of [true, false]) {
+    it(`gives up a download that does not answer in time (${honourAbort ? "aborted" : "fetch ignores the abort"}) and retries next start`, async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { fetchMock, signals } = gatedDownload(honourAbort);
+      const seeding = ensureSeeded();
+      await whenSeeded();
+      while (fetchMock.mock.calls.length === 0) await nextTask();
+      await vi.advanceTimersByTimeAsync(STARTER_NETWORK_TIMEOUT_MS);
+      await seeding; // resolves (the starter network is optional), does not reject
+      expect(signals[0]?.aborted).toBe(true);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("Could not download the starter network"), expect.anything());
+      expect(await names()).toEqual(["Blocky", "Classic", "Sprout"]);
+      expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(false);
+
+      vi.useRealTimers();
+      const retry = gatedDownload();
+      retry.release();
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + 60_000); // the next start
+      await ensureSeeded();
+      expect(await names()).toEqual(["Neuron", "Blocky", "Classic", "Sprout"]);
+    });
+  }
+
+  it("brings all four starters back when all data is deleted while the network downloads", async () => {
+    const { fetchMock, release } = gatedDownload();
+    const first = ensureSeeded();
+    await whenSeeded();
+    await clearAllData();
+    const again = ensureSeeded(); // what Settings → "Delete all data" does next
+    await whenSeeded();
+    // The engines came back at once; they did not wait for the download either.
+    expect(await names()).toEqual(["Blocky", "Classic", "Sprout"]);
+    release();
+    await Promise.all([first, again]);
+    expect(await names()).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect((await networksRepo.list()).map((n) => n.id)).toEqual([STARTER_NETWORK_ID]);
+    expect(await settingsRepo.get(SEED_FLAG_KEY, false)).toBe(true);
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("brings the starters back when all data is deleted right after the network was added", async () => {
+    gatedDownload().release();
+    await ensureSeeded();
+    await clearAllData();
+    await ensureSeeded();
+    expect(await names()).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect(await networksRepo.get(STARTER_NETWORK_ID)).toBeDefined();
+  });
+
+  it("runs another pass when Restore starter engines clears the flags during a download", async () => {
+    const { fetchMock, release } = gatedDownload();
+    const first = ensureSeeded();
+    await whenSeeded();
+    const classic = (await enginesRepo.list()).find((e) => e.name === "Classic")!;
+    await enginesRepo.remove(classic.id);
+    // What restoreStarterEngines (src/pages/engines/actions.ts) does:
+    await settingsRepo.remove(SEED_FLAG_KEY);
+    await settingsRepo.remove(NETWORK_SEED_FLAG_KEY);
+    const restore = ensureSeeded();
+    await whenSeeded();
+    expect((await names()).filter((n) => n === "Classic")).toHaveLength(1); // back without waiting for the download
+    release();
+    await Promise.all([first, restore]);
+    expect(await enginesRepo.get(STARTER_NNUE_ENGINE_ID)).toBeDefined();
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a restored backup's starter network and Neuron, also when the backup arrives during the download", async () => {
+    // A backup from another browser: Neuron and the starter network renamed by the user.
+    gatedDownload().release();
+    await ensureSeeded();
+    await enginesRepo.update(STARTER_NNUE_ENGINE_ID, { name: "My Neuron" });
+    await networksRepo.update(STARTER_NETWORK_ID, { name: "My network" });
+    const json = JSON.parse(await (await exportBackup()).text()) as { stores: { settings: Array<{ key: string }> } };
+    // Without the network flag, so the seeding's own check (records with the fixed ids) is what protects them.
+    json.stores.settings = json.stores.settings.filter((s) => s.key !== NETWORK_SEED_FLAG_KEY);
+    const backup = new Blob([JSON.stringify(json)], { type: "application/json" });
+
+    // A fresh browser restores it while its own first-run download is still going on.
+    await resetStorage();
+    const { release } = gatedDownload();
+    const seeding = ensureSeeded();
+    await whenSeeded();
+    await importBackup(backup);
+    release();
+    await seeding;
+    expect((await enginesRepo.list()).filter((e) => e.id === STARTER_NNUE_ENGINE_ID).map((e) => e.name)).toEqual(["My Neuron"]);
+    expect((await networksRepo.list()).map((n) => n.name)).toEqual(["My network"]);
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(true);
+  });
+
+  it("lets a second tab use its library while the first tab downloads, and downloads only once", async () => {
+    const { fetchMock, release } = gatedDownload();
+    vi.resetModules();
+    const tabA = await import("./seed");
+    const seedingA = tabA.ensureSeeded();
+    await tabA.whenSeeded();
+    while (fetchMock.mock.calls.length === 0) await nextTask(); // A holds the network lock, downloading
+    vi.resetModules();
+    const tabB = await import("./seed");
+    const seedingB = tabB.ensureSeeded();
+    await tabB.whenSeeded(); // B's engines part sees A's flag and is done; its network part waits for A's lock
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.all([seedingA, seedingB]);
     vi.resetModules();
     const { enginesRepo: freshRepo } = await import("./repos");
     expect((await freshRepo.list()).map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);

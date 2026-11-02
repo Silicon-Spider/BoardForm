@@ -88,7 +88,7 @@ export async function deleteNetworkFlow(
           <div className="callout warn">
             <strong>{users.length === 1 ? "1 engine uses it" : `${users.length} engines use it`}:</strong> {users.map((e) => e.name).join(", ")}.
             <br />
-            Without its network an NNUE engine falls back to the basic evaluation (material and piece-square tables).
+            {users.length === 1 ? "It" : "They"} can't play until you choose another network for {users.length === 1 ? "it" : "them"} in the Workshop.
           </div>
         )}
         {runs.length > 0 && <p className="small">It stays listed in the history of {runs.length === 1 ? "the run" : `${runs.length} runs`} that trained it, marked as deleted.</p>}

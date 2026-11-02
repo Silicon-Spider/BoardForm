@@ -15,11 +15,12 @@
   --border-strong: #3a4352;
   --text: #e6e9ef;
   --text-dim: #a3acba;
-  --text-faint: #6d7686;
+  --text-faint: #8a93a3; /* >= 4.6:1 on every surface (WCAG AA) */
 
   --accent: #5b9cf5;
   --accent-strong: #3d84ee;
   --accent-soft: rgba(91, 156, 245, 0.14);
+  --accent-ink: #5b9cf5; /* accent as text on --accent-soft (5.0:1) */
   --accent-text: #0b1220;
   --ok: #4cc38a;
   --ok-soft: rgba(76, 195, 138, 0.15);
@@ -70,10 +71,11 @@
   --border-strong: #c3ccd7;
   --text: #17202b;
   --text-dim: #4d5866;
-  --text-faint: #8a94a3;
+  --text-faint: #646d7b; /* >= 4.6:1 on every surface (WCAG AA) */
   --accent: #2f6fdc;
   --accent-strong: #2259b8;
   --accent-soft: rgba(47, 111, 220, 0.1);
+  --accent-ink: #2259b8; /* accent as text on --accent-soft (5.8:1) */
   --accent-text: #ffffff;
   --ok: #1f9d63;
   --ok-soft: rgba(31, 157, 99, 0.12);
@@ -184,102 +186,16 @@ hr {
   flex-direction: column;
   height: 100%;
 }
-.app-nav {
-  height: var(--nav-height);
-  flex: 0 0 var(--nav-height);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  position: relative;
-  z-index: 20;
-}
-.app-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--text);
-  margin-right: 12px;
-  white-space: nowrap;
-}
-.app-brand:hover {
-  text-decoration: none;
-}
-.app-brand img {
-  width: 28px;
-  height: 28px;
-}
-.app-nav-links {
-  display: flex;
-  gap: 2px;
-}
-.app-nav-link {
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
-  font-weight: 550;
-  white-space: nowrap;
-}
-.app-nav-link:hover {
-  background: var(--surface-3);
-  color: var(--text);
-  text-decoration: none;
-}
-.app-nav-link.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.app-nav-spacer {
-  flex: 1;
-}
-/* Narrow screens: the brand shrinks to its icon and the nav links scroll sideways. */
-@media (max-width: 760px) {
-  .app-nav {
-    gap: 4px;
-    padding: 0 8px;
-  }
-  .app-brand {
-    font-size: 0;
-    gap: 0;
-  }
-  .app-nav-links {
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .app-nav-link {
-    padding: 7px 8px;
-  }
-  .app-nav-spacer {
-    flex: 0 0 4px;
-  }
-}
-.app-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  font-weight: 550;
-  border-bottom: 1px solid var(--border);
-}
-.app-banner.warn {
-  background: var(--warn-soft, var(--surface-2));
-  color: var(--warn, var(--text));
-}
-.app-banner.danger {
-  background: var(--danger-soft, var(--surface-2));
-  color: var(--danger, var(--text));
-}
 .app-main {
   flex: 1;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
+}
+/* Focused only by the skip link; the page itself shows where the user is. */
+.app-main:focus {
+  outline: none;
 }
 .page {
   padding: 24px;
@@ -311,16 +227,382 @@ hr {
   margin-top: 4px;
 }
 
-/* Activity indicator in nav */
+/* Skip link: off-screen until it receives keyboard focus. */
+.app-skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 300;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transform: translateY(calc(-100% - 16px));
+  transition: transform var(--transition);
+}
+.app-skip-link:focus {
+  transform: none;
+  box-shadow: var(--shadow);
+}
+
+/* Top bar. One row from 760 px; below that a second row holds the main destinations as tabs
+   (see the media queries below). --nav-height is the bar's total height (pages size against it). */
+.app-nav {
+  height: var(--nav-height);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 0 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 20;
+}
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 2px;
+  margin-right: 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+}
+.app-brand:hover {
+  text-decoration: none;
+}
+.app-brand img {
+  display: block;
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+.app-nav-links,
+.app-nav-utility {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.app-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-weight: 550;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
+}
+.app-nav-link .app-icon {
+  flex: none;
+  opacity: 0.85;
+}
+.app-nav-link:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  text-decoration: none;
+}
+.app-nav-link.active {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.app-nav-link.active .app-icon {
+  opacity: 1;
+}
+.app-nav-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+/* Medium widths: tighter links; Help and Settings become icons with a tooltip. */
+@media (max-width: 1079px) {
+  .app-brand {
+    margin-right: 6px;
+  }
+  .app-nav-link {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .app-nav-utility .app-nav-link {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .app-nav-utility .app-nav-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .app-nav-utility .app-nav-link::after {
+    /* "/ ''": the tooltip text stays out of the link's accessible name (the hidden label has it). */
+    content: attr(data-tip) / "";
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    padding: 4px 9px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 550;
+    box-shadow: var(--shadow);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 110ms ease;
+  }
+  .app-nav-utility .app-nav-link:hover::after {
+    opacity: 1;
+    transition-delay: 350ms;
+  }
+  .app-nav-utility .app-nav-link:focus-visible::after {
+    opacity: 1;
+  }
+}
+
+/* Narrow: row 1 = brand · activity · Help · Settings; row 2 = Engines | Play | Arena | NNUE Lab. */
+@media (max-width: 759px) {
+  :root {
+    --nav-height: 98px; /* 52 + 45 (tab row with its divider) + 1 px bottom border */
+  }
+  .app-nav {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 0;
+    padding: 0;
+  }
+  .app-brand {
+    order: 0;
+    height: 44px;
+    margin: 4px 0 4px 8px;
+  }
+  .app-nav-spacer {
+    order: 1;
+    height: 52px;
+  }
+  .activity {
+    order: 2;
+  }
+  .app-nav-utility {
+    order: 3;
+    gap: 0;
+    padding-right: 6px;
+  }
+  .app-nav-links {
+    order: 4;
+    flex: 0 0 100%;
+    height: 45px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    padding: 0 4px;
+    border-top: 1px solid var(--border);
+  }
+  .app-nav-links .app-nav-link {
+    height: 44px;
+    min-width: 0;
+    justify-content: center;
+    padding: 0 4px;
+    border-radius: 0;
+  }
+  .app-nav-links .app-nav-link:hover {
+    background: var(--surface-2);
+  }
+  .app-nav-links .app-nav-link.active {
+    background: transparent;
+  }
+  /* The current tab: an accent bar along the bottom edge. */
+  .app-nav-links .app-nav-link.active::after {
+    content: "";
+    position: absolute;
+    left: 16%;
+    right: 16%;
+    bottom: 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: var(--accent);
+  }
+  .app-nav-links .app-nav-link:focus-visible {
+    outline-offset: -3px;
+  }
+}
+/* Phones: tab icons above their labels. */
+@media (max-width: 479px) {
+  .app-brand {
+    gap: 8px;
+    font-size: 15px;
+  }
+  .app-brand img {
+    width: 26px;
+    height: 26px;
+  }
+  .app-nav-links .app-nav-link {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11.5px;
+    line-height: 1.2;
+  }
+  .app-nav-links .app-icon {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+/* Database banner (a newer version in another tab, a blocked upgrade, ...) */
+.app-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 8px 16px;
+  font-weight: 550;
+  border-bottom: 1px solid var(--border);
+}
+.app-banner.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.app-banner.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.app-banner-icon {
+  flex: none;
+}
+.app-banner-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* Lazy page loading: fades in after a moment so quick loads do not flash. */
+.app-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 16px;
+  color: var(--text-dim);
+  animation: fade-in 200ms ease 250ms both;
+}
+
+/* Page crash and page-not-found screens */
+.app-state {
+  display: flex;
+  justify-content: center;
+  padding-top: clamp(24px, 8vh, 80px);
+}
+.app-state-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.app-state-card h1 {
+  font-size: 20px;
+  margin: 14px 0 6px;
+}
+.app-state-card p {
+  max-width: 46ch;
+  margin: 0 0 10px;
+}
+.app-state-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.app-state-icon.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.app-state-message {
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.app-state-path {
+  overflow-wrap: anywhere;
+}
+.app-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.app-crash-details {
+  width: 100%;
+  margin-top: 20px;
+  text-align: left;
+}
+.app-crash-details summary {
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.app-crash-details pre {
+  max-height: 240px;
+  margin: 10px 0;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .app-state.page {
+    padding: 16px;
+  }
+  .app-state-card {
+    padding: 24px 16px;
+  }
+}
+
+/* Activity indicator in the nav bar */
 .activity {
   position: relative;
 }
 .activity-button {
-  display: flex;
-  align-items: center;
+  height: 36px;
+  padding: 0 12px;
   gap: 8px;
+  color: var(--text);
+}
+.activity-button[aria-expanded="true"] {
+  background: var(--surface-3);
 }
 .activity-dot {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -343,16 +625,42 @@ hr {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  width: 340px;
+  width: 360px;
+  max-width: calc(100vw - 16px);
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  padding: 6px;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  padding: 8px;
   z-index: 50;
+  animation: fade-in 120ms ease;
+}
+.activity-panel-header {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 8px;
+}
+.activity-panel-title {
+  font-weight: 650;
+}
+.activity-panel-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .activity-item {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   color: var(--text);
@@ -361,9 +669,72 @@ hr {
   background: var(--surface-3);
   text-decoration: none;
 }
-.activity-item .detail {
-  color: var(--text-dim);
+.activity-item:focus-visible {
+  outline-offset: -2px;
+}
+.activity-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.activity-item-label {
+  min-width: 0;
+  font-weight: 600;
+}
+.activity-item-pct {
+  flex: none;
   font-size: 12px;
+  color: var(--text-dim);
+}
+.activity-item-detail {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.activity-item .progress {
+  display: block;
+  margin-top: 5px;
+}
+.activity-item .progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 240ms ease;
+}
+.activity-item .progress.indeterminate > span {
+  width: 35% !important;
+  animation: indeterminate 1.2s infinite ease-in-out;
+}
+/* Narrow: the panel spans from the right edge of the bar, below the first row. */
+@media (max-width: 759px) {
+  .activity {
+    position: static;
+  }
+  .activity-panel {
+    top: 50px;
+    right: 8px;
+  }
+}
+/* Phones: "2" with the pulse dot; "running" stays for screen readers. */
+@media (max-width: 419px) {
+  .activity-button {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .activity-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .activity-dot {
+    animation: none;
+  }
 }
 
 /* ---------- Layout helpers ---------- */
@@ -441,6 +812,18 @@ hr {
 }
 .hidden {
   display: none !important;
+}
+/* Visually hidden, still read by screen readers. */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ---------- Surfaces ---------- */
@@ -590,7 +973,7 @@ hr {
 }
 .btn-group .btn.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: var(--accent);
   position: relative;
   z-index: 1;
@@ -719,7 +1102,7 @@ input[type="range"] {
 }
 .badge-accent {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .badge-ok {
   background: var(--ok-soft);
@@ -841,36 +1224,203 @@ input[type="range"] {
 }
 
 /* ---------- Toasts ---------- */
+/* At most 3 show (2 on narrow screens); older ones fold into the "+N more" pill (src/app/toast.tsx). */
 .toaster {
   position: fixed;
   bottom: 20px;
   right: 20px;
+  z-index: 200;
+  width: 400px;
+  max-width: calc(100vw - 40px);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 200;
-  max-width: 420px;
+  /* The empty parts of the stack never block clicks on the page underneath. */
+  pointer-events: none;
+}
+.toast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toaster.expanded .toast-list {
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  padding: 2px;
+  margin: -2px;
+  pointer-events: auto;
 }
 .toast {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 8px 10px 12px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-left: 4px solid var(--accent);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
   box-shadow: var(--shadow);
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  animation: fade-in 160ms ease;
+  pointer-events: auto;
+  animation: toast-in 180ms ease;
+}
+.toast[hidden] {
+  display: none;
+}
+.toast-icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
 }
 .toast.success {
   border-left-color: var(--ok);
 }
+.toast.success .toast-icon {
+  color: var(--ok);
+}
 .toast.error {
   border-left-color: var(--danger);
 }
+.toast.error .toast-icon {
+  color: var(--danger);
+}
 .toast.warn {
   border-left-color: var(--warn);
+}
+.toast.warn .toast-icon {
+  color: var(--warn);
+}
+.toast-body {
+  flex: 1;
+  min-width: 0;
+}
+.toast-message {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.toast-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+/* Long details are clamped; "More" opens them (scrollable when very long). */
+.toast-detail {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.toast-detail.open {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.toast-more {
+  padding: 2px 0 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.toast-more:hover {
+  text-decoration: underline;
+}
+.toast-close {
+  flex: none;
+  margin: -4px 0;
+  color: var(--text-dim);
+}
+.toast-overflow {
+  align-self: flex-end;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-sm);
+  pointer-events: auto;
+}
+.toast-overflow button {
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.toast-overflow button:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.toast-overflow-toggle {
+  color: var(--text) !important;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* Narrow screens: full width along the bottom, tighter, details clamped to two lines. */
+@media (max-width: 600px) {
+  .toaster {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    gap: 6px;
+  }
+  .toast-list {
+    gap: 6px;
+  }
+  .toast {
+    gap: 8px;
+    padding: 7px 6px 7px 10px;
+    font-size: 13px;
+  }
+  .toast-detail {
+    font-size: 12px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .toast-icon {
+    width: 15px;
+    height: 15px;
+    margin-top: 1px;
+  }
+  .toast-close.btn-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
 }
 
 /* ---------- Misc ---------- */

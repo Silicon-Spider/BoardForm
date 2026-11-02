@@ -159,7 +159,7 @@ describe("dataset files and the dataset service", () => {
     expect(rec).toMatchObject({ positions: 210, games: 7, chunks: 3, source: { kind: "selfplay", engineId: "e1", engineName: "Classic", randomPlies: 8 } });
     expect(getDatasetJob(id)).toMatchObject({ status: "finished", progress: { gamesDone: 7, gamesTotal: 7, positions: 210 } });
     expect(deps.notify.activities.has(`dataset:${id}`)).toBe(false);
-    expect(deps.notify.toasts.at(-1)).toMatchObject({ kind: "success", message: 'Dataset "Classic games" is ready' });
+    expect(deps.notify.toasts.at(-1)).toMatchObject({ kind: "success", message: "Dataset “Classic games” is ready" });
     expect(source.selfPlayJobs[0]).toMatchObject({ games: 7, concurrency: 2, firstGameIndex: 0, engineName: "Classic" });
     expect(source.selfPlayJobs[0]?.settings.limits).toEqual({ nodes: 1000 });
 

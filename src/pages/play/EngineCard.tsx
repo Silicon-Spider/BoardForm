@@ -83,7 +83,7 @@ function Console({ logs }: { logs: readonly string[] }) {
             stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
           }}
         >
-          {logs.length ? logs.join("\n") : <span className="faint">No output yet. Engines write here with cb_log.</span>}
+          {logs.length ? logs.join("\n") : <span className="faint">No output yet. Messages the engine logs appear here.</span>}
         </pre>
       )}
     </div>

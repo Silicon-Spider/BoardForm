@@ -1,8 +1,11 @@
 // <BlocksEditor> — the drag-and-drop evaluation editor. A thin React shell: Blockly itself is
 // loaded lazily (./editor/mount) the first time an editor is shown, so it stays out of the
 // main bundle. Fills its container; give the parent a height.
+//
+// Edits reach onChange ~300 ms after they happen (debounced). Code that needs the newest edit at
+// once — saving or building right after a change — passes a `ref` and calls `ref.current.flush()`.
 
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type JSX, type Ref } from "react";
 import type { EvalDiagnostic, EvalGeneration } from "./generator";
 import type { EditorController } from "./editor/mount";
 import { DEFAULT_WORKSPACE } from "./default-workspace";
@@ -16,15 +19,27 @@ export interface BlocksEditorProps {
   /** View-only: no toolbox, no editing (zoom and scroll still work). */
   readOnly?: boolean;
   className?: string;
+  /** Imperative handle (React 19 ref prop), see BlocksEditorHandle. */
+  ref?: Ref<BlocksEditorHandle>;
+}
+
+export interface BlocksEditorHandle {
+  /**
+   * Delivers the newest edit through onChange synchronously, before flush() returns, if there is
+   * one that was not reported yet (inside the debounce, or a value still being typed). A no-op when
+   * everything was reported, while the editor is still loading, or when it is read-only.
+   */
+  flush(): void;
 }
 
 type Status = { kind: "loading" } | { kind: "ready" } | { kind: "failed"; message: string };
 
-export function BlocksEditor({ workspace, onChange, readOnly = false, className }: BlocksEditorProps): JSX.Element {
+export function BlocksEditor({ workspace, onChange, readOnly = false, className, ref }: BlocksEditorProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<EditorController | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  useImperativeHandle(ref, () => ({ flush: () => controllerRef.current?.flush() }), []);
   // The newest workspace (from props or from our own edits) — used when the editor is re-created.
   const latestRef = useRef<object>(workspace);
   const [status, setStatus] = useState<Status>({ kind: "loading" });

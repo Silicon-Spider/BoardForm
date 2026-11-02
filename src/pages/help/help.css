@@ -154,7 +154,7 @@
 .help-nav-home.active,
 .help-nav-link.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 650;
 }
 
@@ -847,7 +847,7 @@
   }
   .help-mobile-search-btn.active {
     background: var(--accent-soft);
-    color: var(--accent);
+    color: var(--accent-ink);
     border-color: var(--accent);
   }
   .help-mobile-search {

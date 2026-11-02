@@ -1,14 +1,103 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Build, train and battle your own WebAssembly chess engines in the browser." />
-    <link rel="icon" type="image/svg+xml" href="/pieces/chessnut/wN.svg" />
+    <meta name="color-scheme" content="dark light" />
+    <!-- Kept in step with the app's own theme by applyTheme() (src/app/preferences.ts). -->
+    <meta name="theme-color" content="#161a20" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>BoardForm</title>
+    <script>
+      // Apply the saved colour theme before the first paint (the same rule as applyTheme() in
+      // src/app/preferences.ts), so a light-theme user never sees a dark flash while the app loads.
+      (function () {
+        var theme = "dark";
+        try {
+          var saved = localStorage.getItem("cb.theme");
+          if (saved === "light") theme = "light";
+          else if (saved === "system") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        } catch (e) {
+          /* storage blocked: keep the default */
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "light" ? "#ffffff" : "#161a20");
+      })();
+    </script>
+    <style>
+      /* Start-up screen, shown until the app renders (React replaces the contents of #root). */
+      html {
+        background: #0f1216;
+        color-scheme: dark;
+      }
+      html[data-theme="light"] {
+        background: #f4f6f9;
+        color-scheme: light;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font: 600 15px/1.4 "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        color: #e6e9ef;
+        /* Fade in after a short delay so a fast start does not flash the screen. */
+        animation: boot-in 240ms ease 200ms both;
+      }
+      html[data-theme="light"] .boot {
+        color: #17202b;
+      }
+      .boot-bar {
+        width: 120px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(127, 140, 160, 0.25);
+        overflow: hidden;
+      }
+      .boot-bar::after {
+        content: "";
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: #5b9cf5;
+        animation: boot-slide 1.1s ease-in-out infinite;
+      }
+      @keyframes boot-in {
+        from {
+          opacity: 0;
+        }
+      }
+      @keyframes boot-slide {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(250%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot,
+        .boot-bar::after {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status" aria-label="Loading BoardForm">
+        <img src="/favicon.svg" alt="" width="48" height="48" />
+        <span>BoardForm</span>
+        <div class="boot-bar" aria-hidden="true"></div>
+        <noscript>BoardForm needs JavaScript to run.</noscript>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

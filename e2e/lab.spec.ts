@@ -392,7 +392,7 @@ test.describe("NNUE Lab", () => {
       boards: { selector: "#lab-ds-job .lab-board" },
       workers: { selector: "#lab-ds-job .lab-stat", text: "Workers" },
       activity: { selector: ".activity-button", text: "1 running" },
-      readyToast: { selector: ".toaster .toast", text: "E2E Classic 2k\" is ready" },
+      readyToast: { selector: ".toaster .toast", text: "E2E Classic 2k” is ready" },
     });
     await dialog.getByRole("button", { name: "Start generating" }).click();
 
@@ -996,7 +996,7 @@ test.describe("NNUE Lab", () => {
     const netRow = page.locator("tr", { hasText: netName });
     await menu(page, netRow.getByRole("button", { name: `Actions for ${netName}` }), "Delete…");
     await page.getByRole("dialog").getByRole("button", { name: "Delete network" }).click();
-    await expect(toast(page, "Could not delete the network")).toContainText("The training run “E2E busy” is using this network".replace(/[“”]/g, '"'));
+    await expect(toast(page, "Could not delete the network")).toContainText("The training run “E2E busy” is using this network");
     expect((await listNetworks(page)).some((n) => n.id === keepRec.networkId)).toBe(true);
 
     // Deleting its dataset is refused too.
@@ -1136,7 +1136,7 @@ test.describe("NNUE Lab", () => {
     const alert = page.getByRole("alert").filter({ hasText: "This run stopped because of an error." });
     await expect(alert).toContainText("The network this run starts from no longer exists.");
     await expect(alert.getByRole("button", { name: "Retry" })).toBeVisible();
-    await expect(toast(page, 'Training run "E2E broken" stopped with an error')).toBeVisible();
+    await expect(toast(page, "Training run “E2E broken” stopped with an error")).toBeVisible();
     await expect(page.locator("#lab-run-log")).toContainText("The network this run starts from no longer exists.");
     await captureViews(page, "run-error");
     // Retrying fails the same way (nothing to continue from) and stays readable.
@@ -1189,7 +1189,7 @@ test.describe("NNUE Lab", () => {
     const panel = page.locator("#lab-ds-job");
     await expect(panel).toContainText("Generation stopped with an error", { timeout: 60_000 });
     await expect(panel).toContainText("failed to compile");
-    await expect(toast(page, 'Generating "E2E broken data" failed')).toBeVisible();
+    await expect(toast(page, "Generating “E2E broken data” failed")).toBeVisible();
     await captureViews(page, "dataset-error");
     expect((await readDataset(page, datasetId))!.positions).toBe(0);
     await expect(page.getByRole("button", { name: "Train a network on it" })).toBeDisabled();

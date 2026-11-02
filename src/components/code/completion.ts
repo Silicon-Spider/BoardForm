@@ -12,7 +12,7 @@
 import { insertCompletionText, pickedCompletion, snippetCompletion, type Completion, type CompletionContext, type CompletionResult, type CompletionSource } from "@codemirror/autocomplete";
 import { localCompletionSource } from "@codemirror/lang-javascript";
 import { syntaxTree } from "@codemirror/language";
-import type { EditorState, Text } from "@codemirror/state";
+import { Facet, type EditorState, type Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { ENGINE_API, memberOf, moduleName, moduleRank, scanSource } from "./api";
@@ -222,9 +222,28 @@ export function declaresName(text: string, name: string): boolean {
 }
 
 /**
+ * Where the engine template's modules are, seen from the edited file ("./", or "../" inside a
+ * folder), for files that have no relative import yet to copy the path from. Set by the editor's
+ * `importBase` prop; null (the default) means "never guess" (e.g. scratch engines).
+ */
+export const templateImportBase = /*@__PURE__*/ Facet.define<string | null, string | null>({
+  combine: (values) => values.find((v) => v !== null) ?? null,
+});
+
+/** Offset just after the comment block a file starts with (0 when it starts with code). */
+function afterLeadingComments(text: string): number {
+  const m = /^(?:[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/[ \t]*)?\n)*/.exec(text);
+  let end = m ? m[0].length : 0;
+  // Stop after the last comment line, not after the blank lines that follow it.
+  while (end > 0 && /\s/.test(text[end - 1])) end--;
+  return end;
+}
+
+/**
  * The change that imports `name` from template module `module`, or null when nothing should
  * be added: already imported or declared here, this file *is* that module, or the file has no
- * relative imports at all (then it is not a template-based engine file and we never guess).
+ * relative imports at all and no `templateImportBase` is known (then it is not a template-based
+ * engine file and we never guess).
  */
 export function importChange(state: EditorState, name: string, module: string): { from: number; insert: string } | null {
   const text = state.doc.toString();
@@ -233,7 +252,15 @@ export function importChange(state: EditorState, name: string, module: string): 
   // Editing the module itself (it declares other symbols of the same module)?
   if (ENGINE_API.some((e) => e.module === module && !memberOf(e) && e.name !== name && declaresName(text, e.name))) return null;
   const relative = imports.filter((i) => /^\.\.?\//.test(i.specifier));
-  if (relative.length === 0) return null;
+  if (relative.length === 0) {
+    // A file without imports yet (e.g. a new lib/pawns.ts in a full engine): the first import goes
+    // below its header comment, with the path the editor was told about.
+    const base = state.facet(templateImportBase);
+    if (base === null || imports.length > 0) return null;
+    const at = afterLeadingComments(text);
+    const statement = `import { ${name} } from "${base}${module}";`;
+    return at === 0 ? { from: 0, insert: `${statement}\n\n` } : { from: at, insert: `\n\n${statement}` };
+  }
   const target = relative.find((i) => !i.typeOnly && i.insertAt !== null && moduleName(i.specifier.replace(/^(\.\.\/)+/, "")) === module);
   if (target && target.insertAt !== null) return { from: target.insertAt, insert: `, ${name}` };
   // New statement after the last import, with the same directory prefix ("./" or "../").

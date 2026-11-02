@@ -71,7 +71,7 @@
 .cb-editor-tool.active {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 2px var(--accent);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .cb-editor-board--erase {
   cursor: crosshair;

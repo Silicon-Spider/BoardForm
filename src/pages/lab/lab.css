@@ -102,7 +102,7 @@ a.lab-strong:hover {
 }
 .lab-nav-link.active .lab-nav-count {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 .lab-nav-new {
   flex: none;
@@ -692,6 +692,9 @@ a.lab-strong:hover {
   margin: 0;
   max-width: 760px;
 }
+.lab-guide-head p.lab-guide-starter {
+  margin-top: 8px;
+}
 .lab-guide-steps {
   list-style: none;
   margin: 0;
@@ -722,7 +725,7 @@ a.lab-strong:hover {
   align-items: center;
   justify-content: center;
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 .lab-guide-step.done .lab-guide-num {
@@ -1953,11 +1956,13 @@ a.lab-strong:hover {
   .lab-wizard-count {
     display: none;
   }
-  .lab-wstep-label {
-    display: none;
-  }
-  .lab-wstep.current .lab-wstep-label {
-    display: inline;
+  /* Only the current step shows its name; the others keep it for screen readers. */
+  .lab-wstep:not(.current) .lab-wstep-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
   }
   .lab-wstep {
     flex: 0 0 auto;
@@ -1965,6 +1970,14 @@ a.lab-strong:hover {
   }
   .lab-wstep.current {
     flex: 1 1 auto;
+  }
+  .lab-wstep.current button {
+    min-width: 0;
+  }
+  .lab-wstep.current .lab-wstep-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .lab-cell-name {
     max-width: 200px;
@@ -2079,6 +2092,22 @@ a.lab-strong:hover {
   }
 }
 @media (max-width: 480px) {
+  /* Phones: five equal numbered steps; the step's heading in the card names it. */
+  .lab-wstep,
+  .lab-wstep.current {
+    flex: 1 1 0;
+  }
+  .lab-wstep button {
+    justify-content: center;
+    padding: 8px 4px;
+  }
+  .lab-wstep.current .lab-wstep-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
   .lab-nav-count {
     display: none;
   }

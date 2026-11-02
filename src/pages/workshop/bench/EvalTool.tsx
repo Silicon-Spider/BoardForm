@@ -83,6 +83,9 @@ export function EvalTool({
   // The breakdown's total row is the engine's own trailing "total" line (ABI: White-POV total);
   // without one, cb_eval's score, else the sum of the terms.
   const total = totalLine?.white ?? result?.score ?? (terms.length ? termSum : null);
+  // The headline is in pawns, the breakdown in centipawns: show both units so a bonus of "1" (one
+  // centipawn) is not mistaken for one pawn.
+  const headline = result?.score ?? total;
   const fallback = terms.some((t) => FALLBACK_LABEL.test(t.label));
 
   return (
@@ -103,8 +106,12 @@ export function EvalTool({
       {result && !result.rejected && (
         <div className={"workshop-eval-result" + (stale ? " stale" : "")}>
           <div className="workshop-eval-score">
-            <span className="workshop-eval-big num">{result.score !== null ? formatScore(result.score) : total !== null ? formatScore(total) : "—"}</span>
+            <span className="workshop-eval-headline">
+              <span className="workshop-eval-big num">{headline !== null ? formatScore(headline) : "—"}</span>
+              {headline !== null && <span className="workshop-eval-unit">{Math.abs(headline) === 100 ? "pawn" : "pawns"}</span>}
+            </span>
             <span className="small muted">
+              {headline !== null && <span className="num">{signedInt(headline)} cp · </span>}
               White's point of view · {sideToMove === "w" ? "White" : "Black"} to move
               {positionChanged ? " · position changed" : rebuilt ? " · from the previous engine" : ""}
             </span>
@@ -168,7 +175,7 @@ export function EvalTool({
               while tracing.
             </p>
           )}
-          <p className="small faint">Values in centipawns (100 = one pawn); positive is good for that side.</p>
+          <p className="small faint">The breakdown is in centipawns (cp): 100 cp = one pawn, so a bonus of 1 is a hundredth of a pawn. Positive is good for that side.</p>
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ import { assembleSources, sourceHashOf } from "@/engine-host/build";
 import { TEMPLATE_VERSION, defaultFilesFor, templateFiles } from "@/engine-host/templates";
 import type { CompileResult, EngineRecord } from "@/types";
 import { EngineDraft } from "./draft";
-import { closeTab, newFileContents, openTab, pruneTabs, renameInFiles, renameTab, sortPaths, withExtension, withoutFile } from "./files";
+import { closeTab, importSpecifier, importersOf, newFileContents, openTab, pruneTabs, renameInFiles, renameTab, renameWithImports, resolveSpecifier, sortPaths, withExtension, withoutFile } from "./files";
 import { fenShapeProblem, groupDigits, numberedLine, signedInt, whitePovScore } from "./format";
 import { BENCH_POSITIONS, PERFT_SUITE, PRESET_POSITIONS, expectedPerft, perftSuiteNodes } from "./positions";
 import { buildPillFor } from "./status";
@@ -17,6 +17,21 @@ import { missingRequiredExports, type BuildRun, type EngineBuildState } from "./
 import { REQUIRED_FUNCTIONS } from "@/engine-host/abi";
 import { clearBackup, editsToRestore, readBackup, writeBackup } from "./unsaved";
 import { blocksPatch, blocksToCodeRecord, conversionFor, convertedEvalSource, duplicateRecord, filePatch, parseTags, uniqueName, unlockFullRecord } from "./records";
+import { engineErrorText, runtimeErrorHint } from "./bench/runner";
+
+describe("runtime error hints", () => {
+  it("explains AssemblyScript runtime errors that point into its library", () => {
+    const abort = "abort: Index out of range at ~lib/staticarray.ts:78:41";
+    expect(runtimeErrorHint(abort)).toMatch(/array index was past the end/);
+    expect(engineErrorText(new Error(abort))).toBe(`${abort}. ${runtimeErrorHint(abort)}`);
+    expect(runtimeErrorHint("RuntimeError: divide by zero")).toMatch(/divided by zero/);
+    expect(runtimeErrorHint("RuntimeError: unreachable")).toMatch(/assert/);
+    expect(runtimeErrorHint("RangeError: Maximum call stack size exceeded")).toMatch(/call stack/);
+    expect(runtimeErrorHint("abort: Something else at ~lib/rt/itcms.ts:3:1")).toMatch(/AssemblyScript's own library/);
+    expect(runtimeErrorHint("The engine rejected this position")).toBeNull();
+    expect(engineErrorText(new Error("worker was terminated"))).toMatch(/restarted/);
+  });
+});
 
 function engine(overrides: Partial<EngineRecord> = {}): EngineRecord {
   return {
@@ -192,7 +207,52 @@ describe("file helpers", () => {
     expect(withExtension("lib/pawns")).toBe("lib/pawns.ts");
     expect(withExtension("notes.txt")).toBe("notes.txt");
     expect(withExtension("lib/")).toBe("lib/");
-    expect(newFileContents("lib/pawns.ts")).toContain('from "./pawns"');
+    // The hints use import paths that work from where the file is.
+    const nested = newFileContents("lib/pawns.ts", ["main.ts", "position.ts"], "main.ts");
+    expect(nested).toContain('import { Position } from "../position";');
+    expect(nested).toContain('import { ... } from "./lib/pawns";');
+    // Without a position.ts (scratch engines) there is no Position example.
+    expect(newFileContents("util.ts", ["main.ts"], "main.ts")).not.toContain("Position");
+    expect(newFileContents("main.ts", [], "main.ts")).toContain("Engine ABI");
+  });
+
+  it("works out relative imports and keeps them working when a file is renamed", () => {
+    expect(importSpecifier("main.ts", "lib/util.ts")).toBe("./lib/util");
+    expect(importSpecifier("lib/util.ts", "position.ts")).toBe("../position");
+    expect(importSpecifier("lib/a.ts", "lib/b.ts")).toBe("./b");
+    expect(importSpecifier("lib/x/a.ts", "lib/y/b.ts")).toBe("../y/b");
+    expect(resolveSpecifier("lib/util.ts", "../position")).toBe("position");
+    expect(resolveSpecifier("main.ts", "./lib/util.ts")).toBe("lib/util");
+    expect(resolveSpecifier("main.ts", "../outside")).toBeNull();
+
+    const files = {
+      "main.ts": 'import { a } from "./lib/util";\nimport { b } from "./other";\n',
+      "eval.ts": "import { a } from './lib/util.ts';\n",
+      "lib/util.ts": 'import { Position } from "../position";\nexport function a(): i32 { return 1; }\n',
+      "position.ts": "export class Position {}\n",
+    };
+    expect(importersOf(files, "lib/util.ts").sort()).toEqual(["eval.ts", "main.ts"]);
+    expect(importersOf(files, "position.ts")).toEqual(["lib/util.ts"]);
+    expect(importersOf(files, "main.ts")).toEqual([]);
+
+    // Same folder: importers follow, the file's own imports stay.
+    const same = renameWithImports(files, "lib/util.ts", "lib/names.ts");
+    expect(Object.keys(same.files)).toEqual(["main.ts", "eval.ts", "lib/names.ts", "position.ts"]);
+    expect(same.files["main.ts"]).toBe('import { a } from "./lib/names";\nimport { b } from "./other";\n');
+    expect(same.files["eval.ts"]).toBe("import { a } from './lib/names.ts';\n");
+    expect(same.files["lib/names.ts"]).toBe(files["lib/util.ts"]);
+    expect(same.updated.sort()).toEqual(["eval.ts", "main.ts"]);
+
+    // Moved to the top folder: its own "../position" becomes "./position".
+    const moved = renameWithImports(files, "lib/util.ts", "util.ts");
+    expect(moved.files["util.ts"]).toContain('from "./position"');
+    expect(moved.files["main.ts"]).toContain('from "./util"');
+    expect(moved.updated.sort()).toEqual(["eval.ts", "main.ts", "util.ts"]);
+
+    // Nothing imports it: nothing else changes.
+    const none = renameWithImports(files, "position.ts", "board.ts");
+    expect(none.files["lib/util.ts"]).toContain('from "../board"');
+    expect(none.updated).toEqual(["lib/util.ts"]);
   });
 
   it("renames and deletes files", () => {

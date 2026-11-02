@@ -14,6 +14,8 @@ import { BoardEditor } from "./BoardEditor";
 import { LimitsEditor } from "./LimitsEditor";
 import { EnginePicker } from "./EnginePicker";
 import { Modal } from "./Modal";
+import { EvalBar, finalPosition } from "./EvalBar";
+import { LineChart } from "./LineChart";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -176,7 +178,7 @@ describe("BoardEditor", () => {
     render(<BoardEditor fen={START_FEN} onChange={onChange} />);
     act(() => buttonByText("Clear board").click());
     expect(onChange).not.toHaveBeenCalled();
-    expect(container.querySelector(".cb-editor-status")?.textContent).toMatch(/missing white king/i);
+    expect(container.querySelector(".cb-editor-status")?.textContent).toMatch(/no white king/i);
     // Back to the position the parent already has: nothing new to report.
     act(() => buttonByText("Start position").click());
     expect(onChange).not.toHaveBeenCalled();
@@ -197,7 +199,7 @@ describe("BoardEditor", () => {
       });
     type("8/8/8/8/8/8/8/K6k w - - 0 1 extra");
     expect(onChange).not.toHaveBeenCalled();
-    expect(container.querySelector(".cb-editor-status")?.textContent).toMatch(/six/i);
+    expect(container.querySelector(".cb-editor-status")?.textContent).toMatch(/a FEN has 6/);
     type("8/8/4k3/8/8/4K3/8/8 b");
     expect(onChange).toHaveBeenLastCalledWith("8/8/4k3/8/8/4K3/8/8 b - - 0 1");
     expect(container.querySelectorAll(".cb-piece")).toHaveLength(2);
@@ -229,6 +231,103 @@ describe("LimitsEditor", () => {
     act(() => depth.click());
     expect(onChange).toHaveBeenLastCalledWith({ limits: { depth: 8 }, timeControl: null });
     expect(container.textContent).toMatch(/Max positions searched \(nodes\)/);
+  });
+
+  /** Types into an input the way React sees it (native value setter + input event). */
+  function type(input: HTMLInputElement, text: string) {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    act(() => {
+      setter.call(input, text);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  const inputByLabel = (label: string) => {
+    const l = Array.from(container.querySelectorAll("label")).find((x) => x.textContent === label);
+    if (!l) throw new Error(`label "${label}" not found`);
+    return container.querySelector<HTMLInputElement>(`#${CSS.escape(l.htmlFor)}`)!;
+  };
+
+  it("edits a custom clock in friendly units, down to 1 second", () => {
+    const onChange = vi.fn();
+    const tc = { baseMs: 180_000, incMs: 0, movesPerControl: 40 };
+    render(<LimitsEditor value={{ limits: {}, timeControl: tc }} onChange={onChange} />);
+    const base = inputByLabel("Base time");
+    expect(base.value).toBe("3 min");
+    type(base, "0:03");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: {}, timeControl: { ...tc, baseMs: 3_000 } });
+    type(base, "1:30");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: {}, timeControl: { ...tc, baseMs: 90_000 } });
+    // A bare number means minutes, and says so next to the field.
+    expect(container.querySelector(".cb-limits-custom .cb-limits-suffix")?.textContent).toBe("min");
+    onChange.mockClear();
+    type(base, "0.5 s");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(base.getAttribute("aria-invalid")).toBe("true");
+    expect(container.textContent).toMatch(/At least 1 s/);
+    type(base, "20 s");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: {}, timeControl: { ...tc, baseMs: 20_000 } });
+    expect(base.getAttribute("aria-invalid")).toBeNull();
+    // Increment stays in seconds and accepts a unit.
+    type(inputByLabel("Increment"), "0.5 s");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: {}, timeControl: { ...tc, incMs: 500 } });
+  });
+
+  it("explains the limits in plain words and offers quick picks", () => {
+    const onChange = vi.fn();
+    render(<LimitsEditor compact value={{ limits: {}, timeControl: null }} onChange={onChange} />);
+    expect(container.textContent).toMatch(/half-moves ahead/);
+    expect(container.textContent).toMatch(/positions it may search per move/);
+    const nodes = inputByLabel("Max positions searched (nodes)");
+    expect(nodes.getAttribute("aria-describedby")).toBeTruthy();
+    act(() => buttonByText("10k").click());
+    expect(onChange).toHaveBeenLastCalledWith({ limits: { nodes: 10_000 }, timeControl: null });
+    type(nodes, "2.5k");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: { nodes: 2_500 }, timeControl: null });
+    type(inputByLabel("Time per move"), "250 ms");
+    expect(onChange).toHaveBeenLastCalledWith({ limits: { movetimeMs: 250 }, timeControl: null });
+  });
+});
+
+describe("EvalBar", () => {
+  it("shows the result instead of a stale mate score at a final position", () => {
+    // Black is checkmated; the last engine score still says "mate in 1".
+    const mated = "R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1";
+    render(<EvalBar cp={null} mate={1} fen={mated} />);
+    const bar = container.querySelector(".cb-evalbar")!;
+    expect(bar.textContent).toBe("1-0");
+    expect(bar.getAttribute("aria-label")).toBe("Checkmate — White wins");
+    expect(bar.getAttribute("aria-valuenow")).toBe("100");
+    render(<EvalBar cp={0} fen="7k/5Q2/6K1/8/8/8/8/8 b - - 0 1" />);
+    expect(container.querySelector(".cb-evalbar")!.textContent).toBe("½-½");
+    // A normal position keeps the score.
+    render(<EvalBar cp={null} mate={1} fen="6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1" />);
+    expect(container.querySelector(".cb-evalbar")!.textContent).toBe("M1");
+    expect(finalPosition("6k1/5ppp/8/8/8/8/8/R3K3 w - - 0 1")).toBeNull();
+    expect(finalPosition("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3")?.label).toBe("0-1");
+    expect(finalPosition("not a fen")).toBeNull();
+  });
+});
+
+describe("LineChart", () => {
+  it("a click shows the point under the pointer, keyboard focus starts at the last one", () => {
+    const points = Array.from({ length: 11 }, (_, i) => ({ x: i, y: i * i }));
+    render(<LineChart series={[{ name: "Loss", color: "red", points }]} xLabel="Step" height={200} />);
+    const box = container.querySelector<HTMLElement>(".cb-chart-box")!;
+    const svg = container.querySelector("svg.cb-chart-svg")!;
+    mockRect(svg);
+    // The plot spans padLeft .. width - padRight; aim near its left end.
+    const rect = svg.querySelector<SVGRectElement>(".cb-chart-overlay")!;
+    const left = Number(rect.getAttribute("x"));
+    const plotW = Number(rect.getAttribute("width"));
+    act(() => {
+      box.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: left + plotW * 0.2, pointerId: 1 }));
+      box.focus();
+    });
+    expect(container.querySelector(".cb-chart-tooltip-x")?.textContent).toBe("Step 2");
+    act(() => box.blur());
+    expect(container.querySelector(".cb-chart-tooltip")).toBeNull();
+    act(() => box.focus());
+    expect(container.querySelector(".cb-chart-tooltip-x")?.textContent).toBe("Step 10");
   });
 });
 

@@ -2,6 +2,7 @@
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useActivityStore } from "@/app/activity";
+import { infoRateNote } from "@/engine-host/info-throttle";
 import { enginesRepo, gamesRepo, matchesRepo } from "@/storage/repos";
 import { makeEngine, resetStorage, waitFor } from "@/storage/test-utils";
 import type { MatchConfig, MatchRecord } from "@/types";
@@ -245,13 +246,13 @@ describe("MatchRunner", () => {
     expect(games.map((g) => g.white.name).sort()).toEqual(["Alpha (1)", "Alpha (2)"]);
   });
 
-  it("logs engine output, showing the host's repeating info-merge note once per engine", async () => {
+  it("logs engine output, showing the host's report-rate note once per engine", async () => {
     const id = await createMatch(matchConfig({ gamesPerPairing: 2, concurrency: 1 }));
     const deps = fakeDeps(undefined, {
       async load(engineId, opts) {
-        // Every search of a fast engine can end with this note from the engine worker.
+        // The engine worker says this once per worker; a match starts many workers per engine.
         const e = new FakeEngine(() => {
-          opts.onLog("[host] the engine sent info very often; 12 reports were merged (report once per iteration to avoid this)");
+          opts.onLog(infoRateNote(52_345));
           return {};
         }, engineId);
         opts.onLog("hello from the engine");
@@ -261,9 +262,9 @@ describe("MatchRunner", () => {
     });
     await new MatchRunner(id, deps).run();
     const log = getLiveMatch(id)?.log ?? [];
-    const notes = log.filter((l) => l.text.includes("sent info very often"));
+    const notes = log.filter((l) => l.text.includes("reports search info about 52,000 times a second"));
     expect(notes.map((l) => l.text.split(":")[0]).sort()).toEqual(["Alpha", "Beta"]);
-    expect(notes.every((l) => l.level === "info" && l.text.endsWith("(shown once)"))).toBe(true);
+    expect(notes.every((l) => l.level === "warn" && l.text.endsWith("(shown once)"))).toBe(true);
     // Other output is unchanged: engine lines are info, other host notes are warnings.
     expect(log.find((l) => l.text === "Alpha: hello from the engine")?.level).toBe("info");
     expect(log.find((l) => l.text.startsWith("Beta: [host] 3 more"))?.level).toBe("warn");

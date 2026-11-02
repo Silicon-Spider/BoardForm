@@ -23,7 +23,7 @@
 }
 .cb-limits-presets {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: 6px;
 }
 .cb-limits-chip {
@@ -53,10 +53,11 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-.cb-limits-chip.active {
+.cb-limits-chip.active,
+.cb-limits-chip.active:hover:not(:disabled) {
   background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-ink);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .cb-limits-chip-main {
@@ -82,15 +83,15 @@
   background: var(--bg-sunken);
   border: 1px solid var(--border);
 }
+/* Search limits: one row per limit (label + explanation | input + quick picks). The rows stack
+   when the editor itself is narrow: container queries follow the editor, not the window. */
 .cb-limits-caps {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 10px 14px;
-}
-.cb-limits-cap {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  container-type: inline-size;
+}
+.cb-limits-cap {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -127,6 +128,58 @@
   border-color: var(--danger) !important;
   box-shadow: 0 0 0 3px var(--danger-soft) !important;
 }
+/* Plain-words explanation under a label (a little stronger than --text-faint for small text). */
+.cb-limits-hint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--text-dim) 70%, var(--text-faint));
+}
+.cb-limits-label {
+  overflow-wrap: anywhere;
+}
+
+/* Quick picks: small buttons that set a common value. */
+.cb-limits-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cb-limits-quick-btn {
+  min-width: 30px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition);
+}
+.cb-limits-quick-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.cb-limits-quick-btn.active,
+.cb-limits-quick-btn.active:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.cb-limits-quick-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .cb-limits-summary {
   font-size: 12.5px;
   color: var(--text-dim);
@@ -154,14 +207,96 @@
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
 .cb-limits-caps--compact {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 8px;
-  /* Labels may wrap to two lines; keep the inputs on one line. */
-  align-items: end;
+  gap: 10px;
 }
 .cb-limits-field--compact > label {
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.25;
+}
+.cb-limits-field--compact .cb-limits-hint {
+  font-size: 11px;
+}
+
+/* Row layout: label (or the checkbox lead) + explanation on the left, input + quick picks on the right. */
+.field.cb-limits-field--row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 168px);
+  grid-template-areas:
+    "label input"
+    "hint quick"
+    "error error";
+  column-gap: 10px;
+  row-gap: 3px;
+  align-items: center;
+}
+.cb-limits-field--row > label,
+.cb-limits-field--row > .cb-limits-lead {
+  grid-area: label;
+}
+.cb-limits-field--row > .cb-limits-hint {
+  grid-area: hint;
+  align-self: start;
+}
+.cb-limits-field--row > .cb-limits-input {
+  grid-area: input;
+}
+.cb-limits-field--row > .cb-limits-quick {
+  grid-area: quick;
+  align-self: start;
+}
+.cb-limits-field--row > .cb-limits-error {
+  grid-area: error;
+}
+.cb-limits-field--row .cb-limits-suffix {
+  min-width: 26px;
+}
+.cb-limits-field--row .cb-limits-quick {
+  flex-wrap: nowrap;
+  gap: 3px;
+}
+.cb-limits-field--row .cb-limits-quick-btn {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+/* Full editor: wider input column, explanation lined up with the checkbox label text. */
+.cb-limits-cap .field.cb-limits-field--row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 210px);
+  column-gap: 16px;
+  row-gap: 4px;
+}
+.cb-limits-cap .cb-limits-field--row > .cb-limits-hint {
+  padding-left: 24px;
+}
+.cb-limits-cap .cb-limits-field--row .cb-limits-quick-btn {
+  height: 22px;
+  font-size: 11.5px;
+}
+@container (max-width: 290px) {
+  .field.cb-limits-field--row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "label" "hint" "input" "quick" "error";
+  }
+  .cb-limits-field--row .cb-limits-quick-btn {
+    flex: 0 1 auto;
+    min-width: 36px;
+  }
+}
+@container (max-width: 420px) {
+  .cb-limits-cap .field.cb-limits-field--row {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "label" "hint" "input" "quick" "error";
+    row-gap: 6px;
+  }
+  .cb-limits-cap .cb-limits-field--row > .cb-limits-hint {
+    padding-left: 0;
+  }
+  .cb-limits-cap .cb-limits-field--row .cb-limits-quick-btn {
+    flex: 0 1 auto;
+    min-width: 44px;
+  }
 }
 
 .cb-sr-only {

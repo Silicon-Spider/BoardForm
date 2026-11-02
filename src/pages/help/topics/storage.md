@@ -4,7 +4,7 @@ BoardForm runs entirely in your browser, and that is also where it keeps your wo
 
 ## Where your data lives
 
-Everything is stored in your browser's built-in database (IndexedDB), in a database called `chess-builder` (the app's original name):
+Everything is stored in your browser's built-in database (IndexedDB), in this site's own storage:
 
 - **engines** — their blocks or source files, options and the last compiled build,
 - **networks** — the network files engines load, plus the full-precision weights and optimizer state needed to keep training them,
@@ -15,9 +15,9 @@ Nothing is uploaded to a server. The data belongs to this browser profile on thi
 
 ## Saving happens automatically
 
-There is no Save button to forget. Edits to blocks and code, new engines, finished games, match results and training progress are written to the database as they happen, so closing the tab or reloading the page loses nothing.
+There is no Save button to forget. Edits to blocks and code, new engines, finished games and match results are written to the database as they happen, so closing the tab or reloading the page loses none of them.
 
-Long jobs save checkpoints as they run. Training runs with **Keep training when I reopen the app** switched on continue by themselves when you open the app again; other interrupted runs, dataset jobs, Arena matches and unfinished games on the Play page wait for you to resume them (see [NNUE networks](#/help/nnue?section=running-in-the-background)).
+Long jobs save checkpoints as they run, so one cut off by a closed tab repeats at most a few seconds of work. Training runs with **Keep training when I reopen the app** switched on continue by themselves when you open the app again; other interrupted runs, dataset jobs, Arena matches and unfinished games on the Play page wait for you to resume them (see [NNUE networks](#/help/nnue?section=running-in-the-background)).
 
 ## Keeping your data safe
 

@@ -18,7 +18,7 @@ export interface NetworkChoiceProps {
 function describeNetwork(n: NetworkRecord): string {
   const parts = [`${n.hidden} hidden`, ACTIVATION_NAMES[n.activation] ?? "", formatSize(n.sizeBytes)];
   const seen = n.stats?.positionsSeen ?? 0;
-  parts.push(seen > 0 ? `trained on ${formatCount(seen)} positions` : "untrained");
+  parts.push(seen > 0 ? `${formatCount(seen)} positions seen in training` : "untrained");
   if (typeof n.stats?.valLoss === "number") parts.push(`val loss ${n.stats.valLoss.toFixed(4)}`);
   parts.push(`updated ${formatRelativeTime(n.updatedAt)}`);
   return parts.filter(Boolean).join(" · ");

@@ -58,7 +58,7 @@ export function NetworkDetails({ view, compact }: { view: EngineRecord; compact?
   return (
     <span className="small muted workshop-network-details">
       <span className="num">{networkSummary(net)}</span>
-      {!compact && net.stats.positionsSeen > 0 && <span className="num"> · trained on {formatCount(net.stats.positionsSeen)} positions</span>}
+      {!compact && net.stats.positionsSeen > 0 && <span className="num"> · {formatCount(net.stats.positionsSeen)} positions seen in training</span>}
       {" · "}
       <Link to={`/lab/networks/${encodeURIComponent(net.id)}`}>Open in the NNUE Lab</Link>
     </span>

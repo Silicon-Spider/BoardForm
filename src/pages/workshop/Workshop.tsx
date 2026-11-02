@@ -18,7 +18,7 @@ import {
 } from "react";
 import { navigate, setQuery } from "@/app/router";
 import { dismissToast, toast } from "@/app/toast";
-import { DEFAULT_WORKSPACE, generateEvalSource } from "@/blocks";
+import { DEFAULT_WORKSPACE, generateEvalSource, type BlocksEditorHandle } from "@/blocks";
 import { Tabs, useConfirm, type TabItem } from "@/components";
 import { ApiReference } from "@/components/code";
 import { preloadCompiler } from "@/compiler";
@@ -74,14 +74,6 @@ const MIN_MAIN = 380;
 const NARROW_QUERY = "(max-width: 900px)";
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
-
-/**
- * The block editor hands over an edit ~300 ms after it happened (its debounce, see @/blocks), and
- * offers no way to deliver it sooner. Saving or building a blocks engine waits that long first, so
- * Ctrl+S / Ctrl+B / Build pressed right after editing a block include that edit.
- */
-const BLOCKS_SETTLE_MS = 360;
-const settleBlocks = (kind: EngineKind): Promise<void> => (kind === "blocks" ? new Promise((resolve) => setTimeout(resolve, BLOCKS_SETTLE_MS)) : Promise.resolve());
 
 // ---------------------------------------------------------------------------------------------
 // Hooks
@@ -230,6 +222,11 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   const confirm = useConfirm();
   const narrow = useMediaQuery(NARROW_QUERY);
   const editorRef = useRef<CodePaneHandle>(null);
+  // The block editor hands over an edit ~300 ms after it happened (its debounce, see @/blocks).
+  // Save, Build, the test engine, Convert and Export call flushBlocks() first, so Ctrl+S / Ctrl+B /
+  // Build pressed right after editing a block include that edit (it reaches the draft synchronously).
+  const blocksRef = useRef<BlocksEditorHandle>(null);
+  const flushBlocks = useCallback(() => blocksRef.current?.flush(), []);
   const [reveal, setReveal] = useState<RevealTarget | null>(null);
   const revealNonce = useRef(0);
   const [sourceFile, setSourceFile] = useState("main.ts");
@@ -248,7 +245,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
         label: () => draft.view.name,
         prepare: async (onStatus) => {
           onStatus("Saving your changes…");
-          await settleBlocks(draft.view.kind);
+          flushBlocks();
           if (!(await draft.flush())) throw new Error(`Your latest changes could not be saved: ${draft.getSnapshot().error ?? "unknown error"}`);
           const current = draft.view;
           if (current.kind === "wasm") {
@@ -257,7 +254,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
           }
           const { run } = await runBuild(current, { onStatus });
           if (!run.ok) {
-            if (run.result) throw new BuildError(run.result, `"${current.name}"`);
+            if (run.result) throw new BuildError(run.result, `“${current.name}”`);
             throw new Error(run.problem ?? "The engine could not be built.");
           }
         },
@@ -319,7 +316,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   );
   const doBuild = useCallback(async () => {
     if (draft.view.kind === "wasm") return;
-    await settleBlocks(draft.view.kind);
+    flushBlocks();
     if (!(await draft.flush())) {
       toast("Your changes could not be saved, so the engine was not built", { kind: "error", detail: draft.getSnapshot().error ?? undefined });
       return;
@@ -352,7 +349,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
       });
       setTab("build");
     }
-  }, [draft, session, setTab]);
+  }, [draft, session, setTab, flushBlocks]);
 
   const buildClick = useCallback(() => void doBuild(), [doBuild]);
 
@@ -399,7 +396,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
 
   const createDerived = async (make: (names: string[]) => EngineRecord, done: (r: EngineRecord) => string) => {
     try {
-      await settleBlocks(draft.view.kind);
+      flushBlocks();
       if (!(await draft.flush())) throw new Error(draft.getSnapshot().error ?? "Your changes could not be saved.");
       const record = make(await existingNames());
       await enginesRepo.put(record);
@@ -423,7 +420,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
 
   const exportFile = async () => {
     try {
-      await settleBlocks(draft.view.kind);
+      flushBlocks();
       if (!(await draft.flush())) throw new Error(draft.getSnapshot().error ?? "Your changes could not be saved.");
       const blob = await exportEngineFile(view.id);
       downloadBlob(blob, `${slugify(draft.view.name)}.engine.json`);
@@ -483,7 +480,8 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
       const key = e.key.toLowerCase();
       if (key === "s") {
         e.preventDefault();
-        void settleBlocks(draft.view.kind).then(() => draft.flush());
+        flushBlocks();
+        void draft.flush();
       } else if (key === "b") {
         e.preventDefault();
         if (draft.view.kind !== "wasm") void buildRef.current();
@@ -491,7 +489,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [draft]);
+  }, [draft, flushBlocks]);
 
   useEffect(() => {
     const before = document.title;
@@ -573,7 +571,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
   let main: ReactNode;
   switch (kind) {
     case "blocks":
-      main = <BlocksMain view={view} draft={draft} />;
+      main = <BlocksMain view={view} draft={draft} editorRef={blocksRef} />;
       break;
     case "eval":
     case "nnue":

@@ -27,6 +27,9 @@ import type { AdjudicationConfig, MatchConfig } from "@/types";
 import { plural } from "@/utils/format";
 import { IntField, useEngineMap } from "./shared";
 
+/** Largest hash size offered, as on the Play page and in Settings (the template caps its table there). */
+const MAX_HASH_MB = 512;
+
 interface Row {
   key: number;
   engineId: string | null;
@@ -367,7 +370,7 @@ export function NewMatchDialog({ engineIds = [], config = null, name = null, def
                 {!s.same && (
                   <div className="arena-form-row-settings">
                     <LimitsEditor compact value={r.value} onChange={(value) => setRow(r.key, { value })} />
-                    <IntField label="Hash" suffix="MB" min={1} max={1024} value={r.hashMb} onChange={(hashMb) => setRow(r.key, { hashMb })} width={90} />
+                    <IntField label="Hash" suffix="MB" min={1} max={MAX_HASH_MB} value={r.hashMb} onChange={(hashMb) => setRow(r.key, { hashMb })} width={90} />
                   </div>
                 )}
               </li>
@@ -390,7 +393,7 @@ export function NewMatchDialog({ engineIds = [], config = null, name = null, def
                 label="Hash table"
                 suffix="MB"
                 min={1}
-                max={1024}
+                max={MAX_HASH_MB}
                 value={s.shared.hashMb}
                 onChange={(h) => update({ shared: { ...s.shared, hashMb: h } })}
                 hint="Memory for each engine's transposition table."

@@ -6,15 +6,26 @@
 // * "seeded.v1": the starter engines Blocky, Classic and Sprout;
 // * "seeded.network.v1": the starter NNUE network (public/networks/starter-hl128.nnue, trained on
 //   5M self-play positions) and the engine "Neuron" that plays it. Both have fixed ids, so seeding
-//   again (restore, another tab) never makes a second copy. If the file cannot be fetched, the flag
-//   stays unset and the next start tries again.
+//   again (restore, another tab, a restored backup) never makes a second copy and never overwrites
+//   them. If the file cannot be fetched (offline, or no answer within STARTER_NETWORK_TIMEOUT_MS),
+//   the flag stays unset and the next start tries again.
 //
-// Idempotent, also with several tabs opening at once:
-// * a Web Lock ("boardform:seed", when navigator.locks exists) lets only one tab seed at a time;
-// * the starter engines and the "seeded.v1" flag are written in ONE transaction that re-checks the
-//   flag first, so even without Web Locks two tabs can never both seed (IndexedDB serialises
-//   overlapping read-write transactions).
-// Once seeded, deleting the starter engines does not bring them back (until clearAllData()).
+// The engines part comes first and needs no network. whenSeeded() — which the engines list, the
+// arena and the training service wait for — resolves as soon as it is done, so a slow download
+// never keeps the library loading. The network part follows; ensureSeeded() resolves once both
+// are done. On a first run the four engines are listed Blocky, Classic, Sprout, Neuron (Neuron's
+// timestamps come from the same moment as the others', just older).
+//
+// Idempotent, also with several tabs and with data changing meanwhile:
+// * each part runs under its own Web Lock ("boardform:seed", "boardform:seed:network", when
+//   navigator.locks exists), so only one tab works on a part at a time;
+// * each part and its flag are written in ONE transaction that re-checks the flag first, so even
+//   without Web Locks two tabs can never both seed (IndexedDB serialises overlapping read-write
+//   transactions);
+// * a call while a part is running gets one more pass of that part once it is done: the data may
+//   have changed in between (all data deleted, "Restore starter engines" clearing the flags).
+// Once seeded, deleting the starter engines does not bring them back (until clearAllData() or
+// "Restore starter engines").
 
 import type { EngineRecord, NetworkDataRecord, NetworkRecord } from "@/types";
 import { withTransaction } from "./db";
@@ -32,51 +43,109 @@ export const STARTER_NETWORK_ID = "starter-network-hl128";
 export const STARTER_NNUE_ENGINE_ID = "starter-engine-neuron";
 /** Where the starter network file is served from, relative to the app's base URL. */
 export const STARTER_NETWORK_PATH = "networks/starter-hl128.nnue";
-const SEED_LOCK_NAME = "boardform:seed";
+/** The download of the starter network (about 200 KB) gives up after this long; retried next start. */
+export const STARTER_NETWORK_TIMEOUT_MS = 30_000;
+const ENGINES_LOCK_NAME = "boardform:seed";
+const NETWORK_LOCK_NAME = "boardform:seed:network";
 
-let running: Promise<void> | null = null;
+const noop = (): void => undefined;
 
-/** Create the built-in starter engines on first run. Safe to call any number of times. */
-export function ensureSeeded(): Promise<void> {
-  if (!running) {
-    running = seed().finally(() => {
-      running = null;
-    });
+/**
+ * One part of the seeding in this tab: never two passes at once, and a call during a pass gets
+ * exactly one more pass after it (calls meanwhile share that pass). A pass resolves with whether
+ * it created anything.
+ */
+class SeedPart {
+  private current: Promise<boolean> | null = null;
+  private queued: Promise<boolean> | null = null;
+  private queuedNow = 0;
+
+  constructor(private readonly pass: (now: number) => Promise<boolean>) {}
+
+  run(now: number): Promise<boolean> {
+    if (!this.current) return this.start(now);
+    this.queuedNow = now;
+    if (!this.queued) {
+      this.queued = this.current.then(noop, noop).then(() => {
+        this.queued = null;
+        return this.start(this.queuedNow);
+      });
+    }
+    return this.queued;
   }
-  return running;
+
+  /** Resolves once no pass is running or queued. Never rejects. */
+  idle(): Promise<void> {
+    const pending = this.queued ?? this.current;
+    if (!pending) return Promise.resolve();
+    const again = (): Promise<void> => this.idle();
+    return pending.then(again, again);
+  }
+
+  private start(now: number): Promise<boolean> {
+    const p: Promise<boolean> = this.pass(now).finally(() => {
+      if (this.current === p) this.current = null;
+    });
+    this.current = p;
+    return p;
+  }
+}
+
+const enginesPart = new SeedPart(seedEngines);
+const networkPart = new SeedPart(seedNetwork);
+
+/**
+ * Create the built-in starter engines and the starter network where they are missing (first run,
+ * after all data was deleted, after "Restore starter engines" cleared the flags). Safe to call any
+ * number of times. Rejects only when the starter engines could not be created; a starter network
+ * that cannot be added is logged and tried again on the next start.
+ */
+export async function ensureSeeded(): Promise<void> {
+  // One timestamp for both parts, so a first run lists the four starters in a fixed order.
+  const now = Date.now();
+  const created = await enginesPart.run(now);
+  // First run only, and not awaited: Firefox may show a permission prompt and resolve only once
+  // the user answers it. The result does not matter — the app works either way.
+  if (created) void requestPersistentStorage();
+  await networkPart.run(now);
 }
 
 /**
- * Resolves once a seeding started by ensureSeeded() has finished (immediately if none is running).
- * Never rejects. The engines list waits for it, so a first start shows "loading" rather than an
- * empty library while the starter engines are being created.
+ * Resolves once the starter engines exist (immediately when no seeding is running), without waiting
+ * for the starter network's download. Never rejects. The engines list waits for it, so a first start
+ * shows "loading" rather than an empty library while the starter engines are being created.
  */
 export function whenSeeded(): Promise<void> {
-  if (!running) return Promise.resolve();
-  return running.then(
-    () => undefined,
-    () => undefined,
-  );
+  return enginesPart.idle();
 }
 
 async function flagSet(key: string): Promise<boolean> {
   return Boolean(await settingsRepo.get<unknown>(key, false));
 }
 
-async function seed(): Promise<void> {
-  // Normal start-up: two cheap reads, no lock, no blocks / template modules loaded.
-  if ((await flagSet(SEED_FLAG_KEY)) && (await flagSet(NETWORK_SEED_FLAG_KEY))) return;
-  const created = await withSeedLock(async () => {
-    // Re-check: another tab may have finished while we waited for the lock.
-    // One timestamp for both parts, so the library lists the four starters in a fixed order.
-    const now = Date.now();
-    const engines = (await flagSet(SEED_FLAG_KEY)) ? null : await buildStarterEngines(now);
-    const network = (await flagSet(NETWORK_SEED_FLAG_KEY)) ? null : await loadStarterNetwork(now);
-    return writeStarter(engines, network);
+/** The starter engines part. True when it created them. */
+async function seedEngines(now: number): Promise<boolean> {
+  // Normal start-up: one cheap read, no lock, no blocks / template modules loaded.
+  if (await flagSet(SEED_FLAG_KEY)) return false;
+  return withSeedLock(ENGINES_LOCK_NAME, async () => {
+    if (await flagSet(SEED_FLAG_KEY)) return false; // another tab finished while we waited
+    return writeStarterEngines(await buildStarterEngines(now));
   });
-  // First run only, and not awaited: Firefox may show a permission prompt and resolve only once
-  // the user answers it. The result does not matter — the app works either way.
-  if (created) void requestPersistentStorage();
+}
+
+/** The starter network part. True when it added something. Never rejects: it retries next start. */
+async function seedNetwork(now: number): Promise<boolean> {
+  try {
+    if (await flagSet(NETWORK_SEED_FLAG_KEY)) return false;
+    return await withSeedLock(NETWORK_LOCK_NAME, async () => {
+      if (await flagSet(NETWORK_SEED_FLAG_KEY)) return false;
+      const starter = await loadStarterNetwork(now);
+      return starter ? writeStarterNetwork(starter) : false;
+    });
+  } catch (err) {
+    console.warn("[storage] Could not add the starter network; it will be added on a later start.", err);
+    return false;
+  }
 }
 
 function lockManager(): LockManager | null {
@@ -85,12 +154,12 @@ function lockManager(): LockManager | null {
   return locks && typeof locks.request === "function" ? locks : null;
 }
 
-async function withSeedLock<T>(fn: () => Promise<T>): Promise<T> {
+async function withSeedLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const locks = lockManager();
-  if (!locks) return fn(); // the transaction in writeStarterEngines keeps seeding atomic anyway
+  if (!locks) return fn(); // the transactions in writeStarter* keep seeding atomic anyway
   let started = false;
   try {
-    return (await locks.request(SEED_LOCK_NAME, () => {
+    return (await locks.request(name, () => {
       started = true;
       return fn();
     })) as T;
@@ -180,18 +249,42 @@ interface StarterNetwork {
   engine: EngineRecord;
 }
 
+/** Fetches the starter network file, giving up after STARTER_NETWORK_TIMEOUT_MS. */
+async function downloadStarterNetwork(): Promise<ArrayBuffer> {
+  const url = new URL(`${import.meta.env.BASE_URL ?? "/"}${STARTER_NETWORK_PATH}`, location.href);
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // The race also ends a fetch that ignores the abort signal.
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new DOMException(`No answer within ${Math.round(STARTER_NETWORK_TIMEOUT_MS / 1000)} seconds.`, "TimeoutError");
+      controller?.abort(err);
+      reject(err);
+    }, STARTER_NETWORK_TIMEOUT_MS);
+  });
+  const download = (async () => {
+    const res = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.arrayBuffer();
+  })();
+  download.catch(noop); // after a timeout its rejection (AbortError) is expected and unobserved
+  try {
+    return await Promise.race([download, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Fetches and checks the starter network file and builds its records; null when it cannot be
- * loaded (offline, file missing, outside a browser), in which case seeding retries next start.
+ * loaded (offline, file missing, no answer in time, outside a browser), in which case seeding
+ * retries next start.
  */
 async function loadStarterNetwork(now: number): Promise<StarterNetwork | null> {
   if (typeof fetch !== "function" || typeof location === "undefined") return null;
   let bytes: ArrayBuffer;
   try {
-    const url = new URL(`${import.meta.env.BASE_URL ?? "/"}${STARTER_NETWORK_PATH}`, location.href);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    bytes = await res.arrayBuffer();
+    bytes = await downloadStarterNetwork();
   } catch (err) {
     console.warn("[storage] Could not download the starter network; it will be added on a later start.", err);
     return null;
@@ -250,50 +343,53 @@ async function loadStarterNetwork(now: number): Promise<StarterNetwork | null> {
 }
 
 /**
- * Writes the starter engines and/or the starter network atomically, each part with its flag. A part
- * is skipped when its flag is already set (another tab won the race); the network and its engine are
- * only added where no record with their fixed id exists. True when the starter engines were written.
+ * Writes the starter engines and their flag atomically — unless the flag is set by now (another
+ * tab won the race). True when they were written.
  */
-async function writeStarter(engines: EngineRecord[] | null, starter: StarterNetwork | null): Promise<boolean> {
-  if (!engines && !starter) return false;
+async function writeStarterEngines(engines: EngineRecord[]): Promise<boolean> {
+  const wrote = await withTransaction("create the starter engines", ["engines", "settings"], "readwrite", async (tx) => {
+    const settings = tx.objectStore("settings");
+    const flag = await settings.get(SEED_FLAG_KEY);
+    if (flag !== undefined && Boolean(flag.value)) return false;
+    const store = tx.objectStore("engines");
+    await Promise.all(engines.map((e) => store.put(e)));
+    await settings.put({ key: SEED_FLAG_KEY, value: true });
+    return true;
+  });
+  if (wrote) {
+    emitChanges([
+      ...engines.map((e): ChangeEvent => ({ store: "engines", id: e.id, op: "put" })),
+      { store: "settings", id: SEED_FLAG_KEY, op: "put" },
+    ]);
+  }
+  return wrote;
+}
+
+/**
+ * Adds the starter network and Neuron atomically with their flag — unless the flag is set by now.
+ * Each record is only added where no record with its fixed id exists, so a renamed or retrained
+ * starter (or one from a restored backup) is never overwritten. True when something was added.
+ */
+async function writeStarterNetwork(starter: StarterNetwork): Promise<boolean> {
   const events: ChangeEvent[] = [];
-  const wroteEngines = await withTransaction(
-    "create the starter engines",
-    ["engines", "networks", "networkData", "settings"],
-    "readwrite",
-    async (tx) => {
-      const settings = tx.objectStore("settings");
-      const store = tx.objectStore("engines");
-      let wrote = false;
-      const flag = await settings.get(SEED_FLAG_KEY);
-      if (engines && !(flag !== undefined && Boolean(flag.value))) {
-        await Promise.all(engines.map((e) => store.put(e)));
-        await settings.put({ key: SEED_FLAG_KEY, value: true });
-        events.push(...engines.map((e): ChangeEvent => ({ store: "engines", id: e.id, op: "put" })));
-        events.push({ store: "settings", id: SEED_FLAG_KEY, op: "put" });
-        wrote = true;
-      }
-      const netFlag = await settings.get(NETWORK_SEED_FLAG_KEY);
-      if (starter && !(netFlag !== undefined && Boolean(netFlag.value))) {
-        const networks = tx.objectStore("networks");
-        if ((await networks.get(starter.network.id)) === undefined) {
-          await tx.objectStore("networkData").put(starter.data);
-          await networks.put(starter.network);
-          events.push(
-            { store: "networkData", id: starter.data.id, op: "put" },
-            { store: "networks", id: starter.network.id, op: "put" },
-          );
-        }
-        if ((await store.get(starter.engine.id)) === undefined) {
-          await store.put(starter.engine);
-          events.push({ store: "engines", id: starter.engine.id, op: "put" });
-        }
-        await settings.put({ key: NETWORK_SEED_FLAG_KEY, value: true });
-        events.push({ store: "settings", id: NETWORK_SEED_FLAG_KEY, op: "put" });
-      }
-      return wrote;
-    },
-  );
+  await withTransaction("add the starter network", ["engines", "networks", "networkData", "settings"], "readwrite", async (tx) => {
+    const settings = tx.objectStore("settings");
+    const flag = await settings.get(NETWORK_SEED_FLAG_KEY);
+    if (flag !== undefined && Boolean(flag.value)) return;
+    const networks = tx.objectStore("networks");
+    if ((await networks.get(starter.network.id)) === undefined) {
+      await tx.objectStore("networkData").put(starter.data);
+      await networks.put(starter.network);
+      events.push({ store: "networkData", id: starter.data.id, op: "put" }, { store: "networks", id: starter.network.id, op: "put" });
+    }
+    const engines = tx.objectStore("engines");
+    if ((await engines.get(starter.engine.id)) === undefined) {
+      await engines.put(starter.engine);
+      events.push({ store: "engines", id: starter.engine.id, op: "put" });
+    }
+    await settings.put({ key: NETWORK_SEED_FLAG_KEY, value: true });
+    events.push({ store: "settings", id: NETWORK_SEED_FLAG_KEY, op: "put" });
+  });
   if (events.length > 0) emitChanges(events);
-  return wroteEngines;
+  return events.some((e) => e.store !== "settings");
 }

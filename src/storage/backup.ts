@@ -240,6 +240,7 @@ function parseEngine(value: unknown): EngineRecord {
     description: typeof value.description === "string" ? value.description : "",
     color: typeof value.color === "string" && value.color !== "" ? value.color : DEFAULT_ENGINE_COLOR,
     options,
+    tags: Array.isArray(value.tags) ? value.tags.filter((t): t is string => typeof t === "string") : undefined,
     build: null,
   };
 }
@@ -272,20 +273,43 @@ function parseNetwork(value: unknown): EngineFileNetwork {
   };
 }
 
-/** `name`, or `name (imported)` / `name (imported 2)` ... if that name is taken (case-insensitive). */
-export function uniqueImportName(name: string, taken: readonly string[]): string {
+/** Longest engine name the app lets you type (Workshop, new-engine wizard); imports keep to it. */
+export const MAX_ENGINE_NAME_LENGTH = 80;
+/** Longest network name the NNUE Lab lets you type. */
+export const MAX_NETWORK_NAME_LENGTH = 120;
+/** The tag of the built-in starter engines. An imported copy is the user's own engine: no tag. */
+const STARTER_TAG = "starter";
+
+/** The first `max` UTF-16 units of `s`, without splitting a surrogate pair (an emoji, say). */
+function clip(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
+
+/**
+ * `name`, or `name (imported)` / `name (imported 2)` ... if that name is taken (case-insensitive).
+ * The result is at most `maxLength` characters: a long name is shortened to make room for the suffix.
+ */
+export function uniqueImportName(name: string, taken: readonly string[], maxLength = MAX_ENGINE_NAME_LENGTH): string {
   const norm = (s: string) => s.trim().toLocaleLowerCase();
   const used = new Set(taken.map(norm));
-  if (!used.has(norm(name))) return name;
-  let candidate = `${name} (imported)`;
-  for (let n = 2; used.has(norm(candidate)); n++) candidate = `${name} (imported ${n})`;
+  const base = clip(name.trim(), maxLength).trimEnd();
+  if (!used.has(norm(base))) return base;
+  const withSuffix = (suffix: string) => `${clip(base, Math.max(1, maxLength - suffix.length)).trimEnd()}${suffix}`;
+  let candidate = withSuffix(" (imported)");
+  for (let n = 2; used.has(norm(candidate)); n++) candidate = withSuffix(` (imported ${n})`);
   return candidate;
 }
 
 /**
- * Import a file made by exportEngineFile(). The engine (and its network) get new ids, so importing
- * the same file twice gives two copies; a clashing name gets " (imported)" appended. Any build in
- * the file is dropped (rebuilt on first use). Resolves with the new engine id.
+ * Import a file made by exportEngineFile(). The engine gets a new id, so importing the same file
+ * twice gives two copies; a clashing name gets " (imported)" appended. Any build in the file is
+ * dropped (rebuilt on first use). An exported starter engine comes back as an ordinary engine of
+ * the user's (not built in, no "starter" tag). The network is stored as a new copy too, unless the
+ * library still has that very network (same id, identical weights): then the engine uses it, so
+ * exporting Neuron and importing it back does not store a second starter network. Resolves with the
+ * new engine id.
  */
 export async function importEngineFile(file: Blob): Promise<string> {
   const raw = await readJsonFile(file, "engine file");
@@ -303,42 +327,69 @@ export async function importEngineFile(file: Blob): Promise<string> {
 
   const now = Date.now();
   const engineId = newId();
-  const networkId = network ? newId() : null;
-  await withTransaction("import the engine", ["engines", "networks", "networkData"], "readwrite", async (tx) => {
-    const engines = tx.objectStore("engines");
-    const existing = await engines.getAll();
-    if (network && networkId) {
-      const nets = tx.objectStore("networks");
-      const existingNets = await nets.getAll();
-      const parent = network.record.parentId;
-      await nets.put({
-        ...network.record,
-        id: networkId,
-        name: uniqueImportName(network.record.name, existingNets.map((n) => n.name)),
-        parentId: parent && existingNets.some((n) => n.id === parent) ? parent : null,
+  // Inside one transaction: use the library's copy of the network if it is the same network,
+  // otherwise store the file's network under a new id.
+  const { networkId, networkAdded } = await withTransaction(
+    "import the engine",
+    ["engines", "networks", "networkData"],
+    "readwrite",
+    async (tx) => {
+      const engines = tx.objectStore("engines");
+      const existing = await engines.getAll();
+      let networkId: string | null = null;
+      let networkAdded = false;
+      if (network) {
+        const nets = tx.objectStore("networks");
+        const existingNets = await nets.getAll();
+        const same = existingNets.find((n) => n.id === network.record.id);
+        const stored = same ? await tx.objectStore("networkData").get(same.id) : undefined;
+        if (same && stored && sameBytes(stored.quantized, network.data.quantized)) {
+          networkId = same.id;
+        } else {
+          networkId = newId();
+          networkAdded = true;
+          const parent = network.record.parentId;
+          await nets.put({
+            ...network.record,
+            id: networkId,
+            name: uniqueImportName(network.record.name, existingNets.map((n) => n.name), MAX_NETWORK_NAME_LENGTH),
+            parentId: parent && existingNets.some((n) => n.id === parent) ? parent : null,
+            createdAt: now,
+            updatedAt: now,
+            builtin: false,
+          });
+          await tx.objectStore("networkData").put({ ...network.data, id: networkId });
+        }
+      }
+      const parent = engine.parentId;
+      await engines.put({
+        ...engine,
+        id: engineId,
+        name: uniqueImportName(engine.name, existing.map((e) => e.name)),
+        parentId: parent && existing.some((e) => e.id === parent) ? parent : null,
+        networkId,
         createdAt: now,
         updatedAt: now,
+        build: null,
         builtin: false,
+        tags: engine.tags?.filter((t) => t !== STARTER_TAG),
       });
-      await tx.objectStore("networkData").put({ ...network.data, id: networkId });
-    }
-    const parent = engine.parentId;
-    await engines.put({
-      ...engine,
-      id: engineId,
-      name: uniqueImportName(engine.name, existing.map((e) => e.name)),
-      parentId: parent && existing.some((e) => e.id === parent) ? parent : null,
-      networkId,
-      createdAt: now,
-      updatedAt: now,
-      build: null,
-      builtin: false,
-    });
-  });
+      return { networkId, networkAdded };
+    },
+  );
   const events: ChangeEvent[] = [{ store: "engines", id: engineId, op: "put" }];
-  if (networkId) {
+  if (networkAdded && networkId) {
     events.push({ store: "networks", id: networkId, op: "put" }, { store: "networkData", id: networkId, op: "put" });
   }
   emitChanges(events);
   return engineId;
+}
+
+/** Whether two buffers hold the same bytes. */
+function sameBytes(a: ArrayBuffer, b: ArrayBuffer): boolean {
+  if (a.byteLength !== b.byteLength) return false;
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+  return true;
 }

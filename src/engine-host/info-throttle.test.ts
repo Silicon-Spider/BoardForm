@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InfoThrottle } from "./info-throttle";
+import { INFO_RATE_NOTE_PREFIX, InfoRateWatch, InfoThrottle, infoRateNote } from "./info-throttle";
 
 function harness(burst: number, intervalMs: number) {
   let clock = 0;
@@ -57,5 +57,83 @@ describe("InfoThrottle", () => {
     throttle.flush();
     expect(sent).toEqual([1, 2, 10, 11, 12]);
     expect(throttle.dropped).toBe(0);
+  });
+});
+
+describe("InfoRateWatch", () => {
+  function watch() {
+    let clock = 0;
+    const warnings: number[] = [];
+    const w = new InfoRateWatch((perSecond) => warnings.push(perSecond), { minDurationMs: 1000, maxPerSecond: 1000, now: () => clock });
+    return { w, warnings, advance: (ms: number) => (clock += ms) };
+  }
+
+  it("stays quiet for a burst of fast iterations (many reports within a few milliseconds)", () => {
+    const { w, warnings, advance } = watch();
+    for (let call = 0; call < 200; call++) {
+      w.startCall();
+      for (let depth = 1; depth <= 64; depth++) {
+        w.record();
+        advance(0.01);
+      }
+      advance(5);
+    }
+    expect(warnings).toEqual([]);
+  });
+
+  it("stays quiet for once-per-iteration reports over a long search", () => {
+    const { w, warnings, advance } = watch();
+    w.startCall();
+    // 40 iterations within the first 20 ms, then one report every ~half second for a minute.
+    for (let i = 0; i < 40; i++) {
+      w.record();
+      advance(0.5);
+    }
+    for (let i = 0; i < 120; i++) {
+      advance(500);
+      w.record();
+    }
+    expect(warnings).toEqual([]);
+  });
+
+  it("warns once when the engine keeps reporting far too often, and never again", () => {
+    const { w, warnings, advance } = watch();
+    w.startCall();
+    for (let i = 0; i < 60_000; i++) {
+      w.record();
+      advance(0.02); // 50,000 a second for 1.2 s
+    }
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toBeGreaterThan(40_000);
+    expect(w.warned).toBe(true);
+    w.startCall();
+    for (let i = 0; i < 60_000; i++) {
+      w.record();
+      advance(0.02);
+    }
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("measures each call on its own (quiet calls between fast bursts do not add up)", () => {
+    const { w, warnings, advance } = watch();
+    for (let call = 0; call < 20; call++) {
+      w.startCall();
+      for (let i = 0; i < 500; i++) {
+        w.record();
+        advance(0.1); // 50 ms of very fast reports
+      }
+      advance(2000); // then a long pause before the next search
+    }
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe("infoRateNote", () => {
+  it("rounds the rate and gives accurate advice", () => {
+    const note = infoRateNote(52_345.6);
+    expect(note.startsWith(INFO_RATE_NOTE_PREFIX)).toBe(true);
+    expect(note).toContain("about 52,000 times a second");
+    expect(note).toContain("about 100 a second are shown");
+    expect(infoRateNote(1234)).toContain("about 1,200 times a second");
   });
 });

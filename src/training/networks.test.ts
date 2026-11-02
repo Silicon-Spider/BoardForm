@@ -79,8 +79,8 @@ describe("network service", () => {
     // Mark it running in "another tab": status + a held lock.
     await deps.runs.update(runId, { status: "training" });
     const lock = await deps.locks.acquire(runId);
-    await expect(lab.networks.remove(net)).rejects.toThrow(/"Test run" is using this network/);
-    await expect(lab.datasets.remove("ds")).rejects.toThrow(/"Test run" is using this dataset/);
+    await expect(lab.networks.remove(net)).rejects.toThrow(/“Test run” is using this network/);
+    await expect(lab.datasets.remove("ds")).rejects.toThrow(/“Test run” is using this dataset/);
     lock?.release(); // the other tab is gone: the stale status no longer blocks
     await lab.datasets.remove("ds");
     await lab.networks.remove(net);

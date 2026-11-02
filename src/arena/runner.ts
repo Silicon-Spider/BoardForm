@@ -14,6 +14,7 @@
 // Engines come from injected dependencies (the service passes loadEngine-based ones), which keeps
 // this module free of workers so it can be tested in Node with fake engines.
 import { clearActivity, setActivity } from "@/app/activity";
+import { INFO_RATE_NOTE_PREFIX } from "@/engine-host/info-throttle";
 import { ALL_RECORDS, subscribe } from "@/storage/events";
 import { newId } from "@/storage/id";
 import { enginesRepo, gamesRepo, matchesRepo } from "@/storage/repos";
@@ -57,8 +58,11 @@ const HEARTBEAT_MS = 10_000;
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/** The engine worker's note that it merged info reports (src/engine-host/engine.worker.ts). */
-const REPEATING_HOST_NOTE = /^\[host\] the engine sent info very often/;
+/**
+ * The engine worker's note that an engine reports search info far too often
+ * (src/engine-host/info-throttle.ts). Each new engine worker can give it again.
+ */
+const isInfoRateNote = (line: string): boolean => line.startsWith(INFO_RATE_NOTE_PREFIX);
 
 /** An engine failed to build or start; remembers which one, so the UI can link to it. */
 class EngineFailure extends Error {
@@ -164,7 +168,7 @@ export class MatchRunner {
   // Live state batching.
   private views: Array<LiveGameView | null> = [];
   private pendingLog: ArenaLogEntry[] = [];
-  /** Engines whose repeating host note (REPEATING_HOST_NOTE) was logged already. */
+  /** Engines whose report-rate note (isInfoRateNote) was logged already. */
   private notedEngines = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -509,15 +513,15 @@ export class MatchRunner {
   }
 
   /**
-   * A log line from an engine's worker. The host's note that it merged info reports comes after
-   * almost every fast search (iterations finish within microseconds at small node counts), so it
-   * is shown once per engine and session instead of flooding the log.
+   * A log line from an engine's worker. The host's note that an engine reports search info far
+   * too often comes once per engine worker, and a match starts many of them (a new pair whenever
+   * the engines of a board change), so it is shown once per engine and session.
    */
   private engineLog(name: string, line: string): void {
-    if (REPEATING_HOST_NOTE.test(line)) {
+    if (isInfoRateNote(line)) {
       if (this.notedEngines.has(name)) return;
       this.notedEngines.add(name);
-      this.log("info", `${name}: ${line} (shown once)`);
+      this.log("warn", `${name}: ${line} (shown once)`);
       return;
     }
     this.log(line.startsWith("[host]") ? "warn" : "info", `${name}: ${line}`);

@@ -124,7 +124,7 @@ function FenModal({ open, onClose, onLoad }: { open: boolean; onClose(): void; o
   const load = () => {
     const v = validateFen(text);
     if (!v.ok) {
-      setError(`The FEN is not valid: ${v.error ?? "unknown problem"}.`);
+      setError(`The FEN is not valid. ${v.error ?? "Unknown problem"}.`);
       return;
     }
     onLoad(new ChessGame(text).startFen);

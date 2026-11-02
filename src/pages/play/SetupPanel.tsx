@@ -1,8 +1,8 @@
 // New-game form: quick presets, White / Black (human or any engine, with limits, clock and hash),
 // start position, move delay for engine games, and the Start button. Every change is saved
 // (setting "play.lastSetup") by the page.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { EnginePicker, LimitsEditor, TIME_CONTROL_PRESETS, formatTimeControl, timeControlPresetId, type EnginePickerOption } from "@/components";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ClockTimeField, EnginePicker, LimitsEditor, TIME_CONTROL_PRESETS, formatTimeControl, timeControlPresetId, type EnginePickerOption } from "@/components";
 import type { EngineRecord, TimeControl } from "@/types";
 import { NumberInput } from "./NumberInput";
 import { PlayIcon } from "./icons";
@@ -20,11 +20,13 @@ export function ClockPicker({ value, onChange, disabled, label = "Clock" }: { va
     if (presetId === "custom") setCustomOpen(true);
   }, [presetId]);
   const mode = presetId === "custom" || (customOpen && value) ? "custom" : presetId;
+  const selectId = useId();
   return (
     <div className="play-clockpicker">
       <div className="field">
-        <label>{label}</label>
+        <label htmlFor={selectId}>{label}</label>
         <select
+          id={selectId}
           className="select select-sm"
           value={mode}
           disabled={disabled}
@@ -54,10 +56,26 @@ export function ClockPicker({ value, onChange, disabled, label = "Clock" }: { va
           <option value="custom">{mode === "custom" && value ? `Custom (${formatTimeControl(value)})` : "Custom…"}</option>
         </select>
       </div>
+      {/* The same fields (and words) as the engine side's limits editor. */}
       {mode === "custom" && value && (
         <div className="play-clock-custom">
-          <NumberInput label="Minutes" value={value.baseMs / 60_000} min={0.05} max={600} step={1} disabled={disabled} onCommit={(v) => v !== null && onChange({ ...value, baseMs: Math.round(v * 60_000) })} />
-          <NumberInput label="Increment" suffix="s" value={value.incMs / 1000} min={0} max={600} step={1} disabled={disabled} onCommit={(v) => v !== null && onChange({ ...value, incMs: Math.round(v * 1000) })} />
+          <ClockTimeField label="Base time" compact disabled={disabled} valueMs={value.baseMs} onCommit={(ms) => onChange({ ...value, baseMs: ms })} />
+          <NumberInput label="Increment" suffix="s / move" value={value.incMs / 1000} min={0} max={600} step={1} disabled={disabled} onCommit={(v) => v !== null && onChange({ ...value, incMs: Math.round(v * 1000) })} />
+          <NumberInput
+            label="Moves per control"
+            placeholder="whole game"
+            value={value.movesPerControl ?? null}
+            min={1}
+            max={200}
+            integer
+            allowEmpty
+            disabled={disabled}
+            onCommit={(v) => {
+              const next: TimeControl = { baseMs: value.baseMs, incMs: value.incMs };
+              if (v) next.movesPerControl = v;
+              onChange(next);
+            }}
+          />
         </div>
       )}
     </div>

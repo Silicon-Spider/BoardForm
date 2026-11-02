@@ -69,12 +69,22 @@ export function formatPercent(x: number, digits = 1): string {
   return `${(x * 100).toFixed(digits)}%`;
 }
 
+/**
+ * "just now", "5 min ago", "3 h ago", "2 d ago", then the date. Each unit is rounded first and
+ * moves up to the next unit when rounding reaches it, so 59 min 40 s reads "1 h ago", never
+ * "60 min ago" (likewise 23.6 h → "1 d ago" and 6.6 d → the date). Future times (clock skew
+ * between tabs or devices) read "just now".
+ */
 export function formatRelativeTime(ts: number, now = Date.now()): string {
   const d = now - ts;
+  if (!Number.isFinite(d)) return "—";
   if (d < 45_000) return "just now";
-  if (d < 3_600_000) return `${Math.round(d / 60_000)} min ago`;
-  if (d < 86_400_000) return `${Math.round(d / 3_600_000)} h ago`;
-  if (d < 7 * 86_400_000) return `${Math.round(d / 86_400_000)} d ago`;
+  const minutes = Math.max(1, Math.round(d / 60_000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.max(1, Math.round(d / 3_600_000));
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.max(1, Math.round(d / 86_400_000));
+  if (days < 7) return `${days} d ago`;
   return new Date(ts).toLocaleDateString();
 }
 

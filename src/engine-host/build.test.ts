@@ -256,7 +256,7 @@ describe("getEngineArtifacts", () => {
     const err = await getEngineArtifacts("broken").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(BuildError);
     expect((err as BuildError).result.ok).toBe(false);
-    expect((err as BuildError).message).toMatch(/^"Test engine" failed to compile: main\.ts:1:35 error TS2304/);
+    expect((err as BuildError).message).toMatch(/^“Test engine” failed to compile: main\.ts:1:35 error TS2304/);
   });
 
   it("returns the stored module of uploaded engines", async () => {
@@ -265,7 +265,7 @@ describe("getEngineArtifacts", () => {
     const a = await getEngineArtifacts("up");
     expect(new Uint8Array(a.wasm)).toEqual(new Uint8Array(bytes));
     store(record({ id: "empty", kind: "wasm" }));
-    await expect(getEngineArtifacts("empty")).rejects.toThrow(/has no WebAssembly module/);
+    await expect(getEngineArtifacts("empty")).rejects.toThrow(/^“[^”]+” has no WebAssembly module yet\. Open it in the Workshop and choose a \.wasm file\.$/);
   });
 });
 

@@ -69,7 +69,7 @@ describe("self-play games with the template engine", () => {
     let calls = 0;
     expect(await playSelfPlayGame(engine, SETTINGS, 5, 0, { shouldStop: () => ++calls > 10 })).toBeNull();
     const liar: PlayingEngine = { newGame() {}, position: () => true, go: () => ({ bestMove: "e2e5", info: null }) };
-    await expect(playSelfPlayGame(liar, SETTINGS, 5, 0, ctx)).rejects.toThrow(/illegal move "e2e5"/);
+    await expect(playSelfPlayGame(liar, SETTINGS, 5, 0, ctx)).rejects.toThrow(/illegal move “e2e5”/);
     const mute: PlayingEngine = { newGame() {}, position: () => true, go: () => ({ bestMove: null, info: null }) };
     await expect(playSelfPlayGame(mute, SETTINGS, 5, 0, ctx)).rejects.toThrow(/produced no move/);
   });

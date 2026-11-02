@@ -4,6 +4,7 @@ import {
   LoadAbortedError,
   TrainingSetBuilder,
   buildTrainingSet,
+  emptyDatasetWarning,
   epochPermutation,
   loadTrainingSet,
   splitTrainValidation,
@@ -189,8 +190,29 @@ describe("loadTrainingSet", () => {
     (recs[1] as DatasetChunkRecord).count = 150; // declares more than it holds
     const set = await loadTrainingSet({ datasetIds: ["a", "missing"], validationSplit: 0.1, seed: 1, source: fakeSource({ a: recs }) });
     expect(set.positions).toBe(300);
-    expect(set.warnings.join("\n")).toMatch(/missing has no positions/);
-    expect(set.warnings.join("\n")).toMatch(/declares 150 positions but holds 100/);
+    // No names known: the messages never show internal dataset ids.
+    expect(set.warnings).toContain("One of the selected datasets no longer exists, so it was left out.");
+    expect(set.warnings).toContain("Part 2 of a selected dataset declares 150 positions but holds 100; using 100.");
+    expect(set.warnings.join("\n")).not.toMatch(/missing|\ba:/);
+  });
+
+  it("names datasets in warnings when the source knows their names", async () => {
+    const recs = chunkRecords("a", makeMaterialDataset(300, 1), 100);
+    (recs[0] as DatasetChunkRecord).count = 99;
+    const names: Record<string, string> = { a: "Opening games", empty: "Fresh dataset" };
+    const source: ChunkSource = {
+      ...fakeSource({ a: recs, empty: [] }, { a: 300, empty: 0 }),
+      name: async (id) => names[id] ?? null,
+    };
+    const set = await loadTrainingSet({ datasetIds: ["a", "empty", "gone"], validationSplit: 0.1, seed: 1, source });
+    expect(set.warnings).toContain("The dataset “Fresh dataset” has no positions yet, so it adds nothing to the training data.");
+    expect(set.warnings).toContain("One of the selected datasets no longer exists, so it was left out.");
+    expect(set.warnings).toContain("Part 1 of the dataset “Opening games” declares 99 positions but holds 100; using 99.");
+  });
+
+  it("words the empty-dataset warning for sources that cannot tell missing from empty", () => {
+    expect(emptyDatasetWarning(null, null)).toBe("One of the selected datasets has no positions (or no longer exists), so it adds nothing to the training data.");
+    expect(emptyDatasetWarning("Mine", false)).toBe("The dataset “Mine” no longer exists, so it was left out.");
   });
 
   it("can be cancelled between chunks", async () => {

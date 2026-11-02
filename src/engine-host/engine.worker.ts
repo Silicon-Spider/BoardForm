@@ -3,7 +3,7 @@
 // terminating the worker (see client.ts).
 import type { SearchInfo } from "@/types";
 import { workerScope } from "@/utils/misc";
-import { InfoThrottle } from "./info-throttle";
+import { InfoRateWatch, InfoThrottle, infoRateNote } from "./info-throttle";
 import { EngineInstance } from "./instance";
 import { rememberModuleInfo } from "./module-info";
 import type { EngineMethods, EngineWorkerCall, EngineWorkerRequest, EngineWorkerResponse } from "./protocol";
@@ -20,6 +20,11 @@ let logBudget = MAX_LOG_LINES_PER_CALL;
 let suppressedLogs = 0;
 /** Engines that report at every node would otherwise flood the main thread (see info-throttle.ts). */
 const infos = new InfoThrottle<SearchInfo>((info) => post({ type: "info", id: currentCall, info }));
+/**
+ * Merging reports is routine (fast iterations at small node counts); an engine that keeps
+ * reporting far more often than once per iteration is told so, once per engine session.
+ */
+const infoRate = new InfoRateWatch((perSecond) => post({ type: "log", text: infoRateNote(perSecond) }));
 
 function forwardLog(text: string): void {
   if (logBudget > 0) {
@@ -60,6 +65,7 @@ function handleCall(call: EngineWorkerCall): void {
   logBudget = MAX_LOG_LINES_PER_CALL;
   suppressedLogs = 0;
   infos.reset();
+  infoRate.startCall();
   try {
     if (!engine) throw new Error("The engine is not initialised.");
     const value = dispatch(engine, call);
@@ -70,9 +76,6 @@ function handleCall(call: EngineWorkerCall): void {
     post({ type: "error", id: call.id, message: err instanceof Error ? err.message : String(err), crashed: engine?.broken ?? false });
   } finally {
     if (suppressedLogs > 0) post({ type: "log", text: `[host] ${suppressedLogs} more log lines from this call were suppressed` });
-    if (infos.dropped > 0) {
-      post({ type: "log", text: `[host] the engine sent info very often; ${infos.dropped} reports were merged (report once per iteration to avoid this)` });
-    }
   }
 }
 
@@ -88,7 +91,10 @@ scope.onmessage = (ev: MessageEvent) => {
           stopFlag: msg.stopBuffer ? new Int32Array(msg.stopBuffer) : null,
           hashMb: msg.hashMb ?? undefined,
           network: msg.network,
-          onInfo: (info) => infos.push(info),
+          onInfo: (info) => {
+            infoRate.record();
+            infos.push(info);
+          },
           onLog: forwardLog,
         });
         infos.flush();

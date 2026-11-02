@@ -382,7 +382,7 @@ export class RunController {
       ds = {
         id,
         name: `${this.name} - cycle ${c + 1}`,
-        description: `Self-play games of cycle ${c + 1} of the training run "${this.name}", played by ${engine.name}.`,
+        description: `Self-play games of cycle ${c + 1} of the training run “${this.name}”, played by ${engine.name}.`,
         createdAt: now,
         updatedAt: now,
         positions: 0,
@@ -408,7 +408,7 @@ export class RunController {
     const datasetId = ds.id;
     const workers = Math.max(1, Math.min(sp.concurrency, await deps.maxWorkers()));
     const dsLock = await deps.locks.acquire(datasetLockKey(datasetId));
-    if (!dsLock) throw new Error(`The dataset "${ds.name}" is being written by another tab, so this run cannot add its games now.`);
+    if (!dsLock) throw new Error(`The dataset “${ds.name}” is being written by another tab, so this run cannot add its games now.`);
     let writer: DatasetWriter;
     try {
       writer = await DatasetWriter.open(deps.datasets, datasetId, deps.timing.datasetWriter);
@@ -465,7 +465,7 @@ export class RunController {
     const [parent, data] = await Promise.all([deps.networks.get(fromId), deps.networks.getData(fromId)]);
     if (!parent || !data || !data.quantized) {
       throw new Error(
-        c === 0 ? "The network this run starts from no longer exists." : `The network of cycle ${c} ("${parent?.name ?? "deleted"}") no longer exists, so training cannot continue from it.`,
+        c === 0 ? "The network this run starts from no longer exists." : `The network of cycle ${c} (“${parent?.name ?? "deleted"}”) no longer exists, so training cannot continue from it.`,
       );
     }
     let float = data.float;
@@ -740,7 +740,7 @@ export class RunController {
       id,
       name,
       description:
-        `Trained by the run "${this.name}"${this.config.loop.enabled ? `, cycle ${c + 1}` : ""}: ${epochText} (${formatCount(result.positionsSeen)} positions seen)` +
+        `Trained by the run “${this.name}”${this.config.loop.enabled ? `, cycle ${c + 1}` : ""}: ${epochText} (${formatCount(result.positionsSeen)} positions seen)` +
         `${result.valLoss !== null ? `, validation loss ${result.valLoss.toFixed(5)}` : ""}.${opts.snapshot ? " Saved when the run was stopped." : ""}`,
       createdAt: now,
       updatedAt: now,
@@ -766,7 +766,7 @@ export class RunController {
     this.rec.networkId = id;
     this.log(
       "info",
-      `Saved the network "${name}"${result.valLoss !== null ? ` (validation loss ${result.valLoss.toFixed(5)}, epoch ${result.epoch})` : ""}.`,
+      `Saved the network “${name}”${result.valLoss !== null ? ` (validation loss ${result.valLoss.toFixed(5)}, epoch ${result.epoch})` : ""}.`,
     );
     await this.flushNow();
   }
@@ -836,7 +836,7 @@ export class RunController {
     if (this.stopMode) return;
     const workers = Math.max(1, Math.min(total, await deps.maxWorkers()));
     const sp = this.config.data.selfPlay;
-    this.log("info", `Gating: "${newRec.name}" plays ${total} games against "${oldRec.name}" on ${workers} worker${workers === 1 ? "" : "s"}.`);
+    this.log("info", `Gating: “${newRec.name}” plays ${total} games against “${oldRec.name}” on ${workers} worker${workers === 1 ? "" : "s"}.`);
     const update = () => {
       tally.score = tally.played > 0 ? (tally.wins + tally.draws / 2) / tally.played : 0.5;
       this.live.gating = { ...tally, boards: [...tally.boards] };
@@ -879,8 +879,8 @@ export class RunController {
     const accepted = played > 0 && score >= gating.minScore;
     this.log(
       accepted ? "info" : "warn",
-      `Gating: the new network scored ${formatPercent(score)} (+${summary.wins} =${summary.draws} −${summary.losses}) against "${oldRec.name}" — ` +
-        (accepted ? "accepted." : `rejected (needs ${formatPercent(gating.minScore)}); the next cycle plays with "${oldRec.name}".`),
+      `Gating: the new network scored ${formatPercent(score)} (+${summary.wins} =${summary.draws} −${summary.losses}) against “${oldRec.name}” — ` +
+        (accepted ? "accepted." : `rejected (needs ${formatPercent(gating.minScore)}); the next cycle plays with “${oldRec.name}”.`),
     );
     await setGating({ score, games: played, accepted });
   }
@@ -895,7 +895,7 @@ export class RunController {
       const net = await deps.networks.get(target);
       const engineId = await this.ctx.networks.createEngine(target, { name: this.name });
       this.rec.engineId = engineId;
-      this.log("info", `Published the engine "${this.name}" with the network "${net?.name ?? "?"}". Find it in the engine library.`);
+      this.log("info", `Published the engine “${this.name}” with the network “${net?.name ?? "?"}”. Find it in the engine library.`);
       await this.flushNow();
       return;
     }
@@ -907,7 +907,7 @@ export class RunController {
     if (engine.networkId !== target) {
       await deps.engines.update(engine.id, { networkId: target });
       const net = await deps.networks.get(target);
-      this.log("info", `The engine "${engine.name}" now uses the network "${net?.name ?? "?"}".`);
+      this.log("info", `The engine “${engine.name}” now uses the network “${net?.name ?? "?"}”.`);
       await this.flushNow();
     }
   }
@@ -921,9 +921,9 @@ export class RunController {
     await this.flushNow();
     await this.deleteCheckpoints().catch((e) => console.warn("[training] could not delete checkpoints", e));
     const net = this.rec.networkId ? await this.deps.networks.get(this.rec.networkId).catch(() => undefined) : undefined;
-    this.deps.notify.toast(`Training run "${this.name}" finished`, {
+    this.deps.notify.toast(`Training run “${this.name}” finished`, {
       kind: "success",
-      detail: net ? `Newest network: "${net.name}"${net.stats.valLoss !== null ? ` (validation loss ${net.stats.valLoss.toFixed(5)})` : ""}.` : undefined,
+      detail: net ? `Newest network: “${net.name}”${net.stats.valLoss !== null ? ` (validation loss ${net.stats.valLoss.toFixed(5)})` : ""}.` : undefined,
     });
   }
 
@@ -947,7 +947,7 @@ export class RunController {
     } catch (e) {
       console.error("[training] could not save the failed run", e);
     }
-    this.deps.notify.toast(`Training run "${this.name}" stopped with an error`, { kind: "error", detail: message });
+    this.deps.notify.toast(`Training run “${this.name}” stopped with an error`, { kind: "error", detail: message });
   }
 
   private exit(): void {

@@ -109,7 +109,8 @@ export function describeParticipant(p: Pick<ParticipantConfig, "limits" | "timeC
   if (p.timeControl) parts.push(formatTimeControl(p.timeControl));
   const l: EngineLimits = p.limits ?? {};
   if (l.depth) parts.push(`depth ${l.depth}`);
-  if (l.nodes) parts.push(`${formatCount(l.nodes)} nodes`);
+  // "3k nodes" rather than formatCount's "3.00k", as on the Play page.
+  if (l.nodes) parts.push(`${formatCount(l.nodes).replace(/\.(\d*?)0+(?=[kMG]$)/, (_, d: string) => (d ? `.${d}` : ""))} nodes`);
   if (l.movetimeMs) parts.push(`${Number((l.movetimeMs / 1000).toFixed(3))} s/move`);
   return parts.length ? parts.join(" · ") : "1 s/move (default)";
 }

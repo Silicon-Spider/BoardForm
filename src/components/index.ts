@@ -12,8 +12,8 @@ export { MoveList, startPlyFromFen } from "./MoveList";
 export type { MoveListProps } from "./MoveList";
 export { Clock } from "./Clock";
 export type { ClockProps } from "./Clock";
-export { EvalBar, evalToWhiteShare } from "./EvalBar";
-export type { EvalBarProps } from "./EvalBar";
+export { EvalBar, evalToWhiteShare, finalPosition } from "./EvalBar";
+export type { EvalBarProps, FinalPosition } from "./EvalBar";
 export { LineChart, CHART_COLORS, niceTicks } from "./LineChart";
 export type { LineChartProps, ChartSeries, ChartPoint } from "./LineChart";
 
@@ -30,8 +30,10 @@ export type { TooltipProps } from "./Tooltip";
 export { Toolbar, ToolbarGroup, ToolbarSeparator, ToolbarSpacer } from "./Toolbar";
 export type { ToolbarProps } from "./Toolbar";
 
-export { LimitsEditor, TIME_CONTROL_PRESETS, formatTimeControl, describeLimits, timeControlPresetId } from "./LimitsEditor";
-export type { LimitsEditorProps, LimitsValue, TimeControlPreset } from "./LimitsEditor";
+export { LimitsEditor, ClockTimeField, TIME_CONTROL_PRESETS, describeLimits, timeControlPresetId } from "./LimitsEditor";
+export type { LimitsEditorProps, LimitsValue, TimeControlPreset, ClockTimeFieldProps } from "./LimitsEditor";
+export { formatTimeControl, describeTimeControl, formatClockTime, parseClockTime, parseSecondsText } from "./timeFormat";
+export type { ParsedClockTime, ClockTimeRule } from "./timeFormat";
 export { EnginePicker } from "./EnginePicker";
 export type { EnginePickerProps, EnginePickerOption } from "./EnginePicker";
 export { KindBadge, KIND_LABELS, KIND_DESCRIPTIONS, kindColor } from "./KindBadge";

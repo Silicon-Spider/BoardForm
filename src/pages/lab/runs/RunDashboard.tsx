@@ -21,6 +21,7 @@ import {
   wasInterrupted,
   type RunPhase,
 } from "../model/format";
+import { worseThanStart } from "../model/outcome";
 import { ActionMenu } from "../ui/ActionMenu";
 import { Breadcrumbs, LoadingBlock, NotFoundState, Panel, RunStatusBadge, Switch } from "../ui/common";
 import { ConfigSummary } from "../ui/ConfigSummary";
@@ -408,6 +409,21 @@ function RunNotices({
         )}
       </div>,
     );
+    // Continuing a strong network on a few thousand positions often makes it worse: say so.
+    const worse = worseThanStart(run);
+    if (worse) {
+      notices.push(
+        <div key="worse" className="callout warn lab-notice" data-testid="lab-run-worse">
+          <Icon name="alert" />
+          <div className="grow">
+            <strong>The new network is not better than the one it started from.</strong> On this run's held-out positions its validation loss is{" "}
+            {formatLoss(worse.finalLoss)}; the network it started from had {formatLoss(worse.startLoss)} before training (lower is better). With
+            few positions a network learns them by heart instead of improving: train on more games, or with a lower learning rate. The network it
+            started from is unchanged.
+          </div>
+        </div>,
+      );
+    }
   }
   if (notices.length === 0) return null;
   return <div className="stack-sm">{notices}</div>;

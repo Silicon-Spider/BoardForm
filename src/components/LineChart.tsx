@@ -248,6 +248,9 @@ export function LineChart({
   onPointClick,
 }: LineChartProps) {
   const boxRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  /** Set by pointerdown so the focus that follows a click does not jump to the last point. */
+  const pointerFocus = useRef(false);
   const width = useElementWidth(boxRef, 560);
   const clipId = "cbclip" + useId().replace(/[^a-zA-Z0-9_-]/g, "");
   /** Hovered/focused x in data units. */
@@ -409,6 +412,15 @@ export function LineChart({
     return { x: snap, rows };
   }, [activeX, withData, hasData]);
 
+  /** Data x under a client X coordinate, or null outside the plot area. */
+  const xAtClient = (clientX: number): number | null => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const px = clientX - svg.getBoundingClientRect().left;
+    if (px < padLeft || px > padLeft + plotW) return null;
+    return dom.x0 + ((px - padLeft) / plotW) * (dom.x1 - dom.x0);
+  };
+
   /** Keyboard: step through the x positions of the densest series. */
   const stepFocus = (dir: -1 | 1 | "first" | "last") => {
     if (!hasData) return;
@@ -462,12 +474,25 @@ export function LineChart({
             onPointClick(hover.x);
           }
         }}
-        onFocus={(e) => {
-          if (e.target === e.currentTarget && activeX === null) stepFocus("last");
+        onPointerDown={(e) => {
+          // A click (or tap) focuses the box: show the point under the pointer, not the last one.
+          // pointerdown comes before focus, and before any pending pointermove re-render.
+          pointerFocus.current = true;
+          const x = xAtClient(e.clientX);
+          if (x !== null) setActiveX(x);
         }}
-        onBlur={() => setActiveX(null)}
+        onFocus={(e) => {
+          const fromPointer = pointerFocus.current;
+          pointerFocus.current = false;
+          // Keyboard focus starts the readout at the latest point.
+          if (!fromPointer && e.target === e.currentTarget && activeX === null) stepFocus("last");
+        }}
+        onBlur={() => {
+          pointerFocus.current = false;
+          setActiveX(null);
+        }}
       >
-        <svg width={width} height={height} className="cb-chart-svg" aria-hidden="true">
+        <svg ref={svgRef} width={width} height={height} className="cb-chart-svg" aria-hidden="true">
           <defs>
             <clipPath id={clipId}>
               <rect x={padLeft} y={padTop - 4} width={plotW} height={plotH + 8} />
@@ -571,10 +596,8 @@ export function LineChart({
             width={plotW}
             height={padTop + plotH}
             onPointerMove={(e) => {
-              const svg = e.currentTarget.ownerSVGElement;
-              if (!svg) return;
-              const px = e.clientX - svg.getBoundingClientRect().left;
-              setActiveX(dom.x0 + ((px - padLeft) / plotW) * (dom.x1 - dom.x0));
+              const x = xAtClient(e.clientX);
+              if (x !== null) setActiveX(x);
             }}
             onPointerLeave={() => setActiveX(null)}
             onClick={

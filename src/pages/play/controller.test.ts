@@ -237,6 +237,14 @@ describe("GameController: human vs engine", () => {
     expect(c2.getState().phase).toBe("playing");
     expect(c2.getState().engines.w?.logs.join("\n")).toMatch(/overran its time limit/);
     c2.dispose();
+
+    // Only a depth cap: the host's safety deadline stopped it; the log says so (no "time limit").
+    const h3 = harness({ e1: new FakeEngine((g) => done(g.legalMoves()[0], { stopReason: "timeout" })) });
+    const c3 = startGame(h3, engineSide("e1", { depth: 30 }), HUMAN_SIDE);
+    await until(c3, (s) => s.moves.length === 1);
+    expect(c3.getState().phase).toBe("playing");
+    expect(c3.getState().engines.w?.logs.join("\n")).toMatch(/longest a search limited only by depth or nodes may take/);
+    c3.dispose();
   });
 
   it("overrunning the per-move cap with clock time left is not a flag fall", async () => {

@@ -1,6 +1,6 @@
 // Numbered SAN move list with clickable plies, current-ply highlight, auto-scroll and
 // keyboard navigation (←/→, Home/End) plus optional navigation buttons.
-import { memo, useLayoutEffect, useRef, type ReactNode } from "react";
+import { memo, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Icon } from "./icons";
 import "./MoveList.css";
 
@@ -35,6 +35,7 @@ export function startPlyFromFen(fen: string): number {
 function MoveListImpl({ san, currentPly, onSelectPly, startPly = 0, result, controls, emptyText, className }: MoveListProps) {
   const current = currentPly ?? san.length;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const idBase = useId();
   const select = (ply: number) => onSelectPly?.(Math.max(0, Math.min(san.length, ply)));
 
   // Keep the current move visible (scrolls the list only, never the page).
@@ -62,13 +63,17 @@ function MoveListImpl({ san, currentPly, onSelectPly, startPly = 0, result, cont
   const cell = (i: number) => {
     const ply = i + 1;
     return (
+      // Options of the "Moves" listbox; the list itself takes focus and the arrow keys.
       <button
         key={`m${i}`}
+        id={`${idBase}-ply${ply}`}
         type="button"
+        role="option"
         className={"cb-ml-move" + (ply === current ? " cb-ml-move--current" : "")}
         data-ply={ply}
         onClick={() => select(ply)}
         tabIndex={-1}
+        aria-selected={ply === current}
         aria-current={ply === current ? "true" : undefined}
       >
         {san[i]}
@@ -106,6 +111,7 @@ function MoveListImpl({ san, currentPly, onSelectPly, startPly = 0, result, cont
         tabIndex={0}
         role="listbox"
         aria-label="Moves"
+        aria-activedescendant={current > 0 && current <= san.length ? `${idBase}-ply${current}` : undefined}
         onKeyDown={(e) => {
           if (!onSelectPly) return;
           const keys: Record<string, number> = {

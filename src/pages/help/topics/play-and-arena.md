@@ -6,7 +6,7 @@ Building an engine is half the fun; the other half is watching it play. The [Pla
 
 The [Play](#/play) page has two modes, **Play** and **Analysis**. In Play mode, the **New game** panel sets up a game:
 
-- **Quick start** offers ready-made games: *You vs engine* (as White or as Black, the engine thinking one second per move), *Blitz 5+3* and *Engine vs engine*.
+- **Quick start** offers ready-made games: *You vs engine* (as White or as Black, the engine thinking one second per move), *Blitz 3+2* and *Engine vs engine*.
 - **Players:** choose **Human** or one of your engines for White and for Black (the swap button between them exchanges the colours). Each engine gets its own [limits](#clocks-and-limits) and hash table size; a human player gets a clock or none.
 - **Start position:** **Standard**, a named **Opening**, **Random** moves for variety, or a **Custom** FEN.
 

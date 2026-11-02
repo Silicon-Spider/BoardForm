@@ -42,6 +42,11 @@ export interface CodeEditorProps {
   /** Ctrl/Cmd+S inside the editor (the browser's "Save page" dialog is always suppressed there). */
   onSave?(): void;
   /**
+   * The user tried to change a read-only document (typed, pasted, cut or dropped text), e.g. to
+   * explain why nothing happens and how to get an editable copy. Addition to the original contract.
+   */
+  onReadOnlyEdit?(): void;
+  /**
    * Scrolls to a line, places the cursor there (at `column`, else at the first non-blank
    * character), briefly highlights the line and focuses the editor. Runs again whenever
    * `nonce` changes, so bump it to reveal the same line twice.
@@ -54,6 +59,13 @@ export interface CodeEditorProps {
    * Pass false for engines that do not contain the template modules (e.g. scratch engines).
    */
   completions?: boolean;
+  /**
+   * Relative path from this file to the engine template's modules: "./" for a file next to them,
+   * "../" inside a folder. Lets auto-import (completions and `insert`) add the first import to a
+   * file that has none yet; without it such files are never given a guessed import. Addition to
+   * the original contract.
+   */
+  importBase?: string;
   /**
    * Inserts `text` at the cursor (replacing the selection) and focuses the editor, whenever
    * `nonce` changes (addition to the original contract). Made for ApiReference:
@@ -103,6 +115,11 @@ export interface FileTreeProps {
   onRename?(from: string, to: string): void;
   /** Called after the user confirmed the deletion. */
   onDelete?(path: string): void;
+  /**
+   * Extra sentence for the delete confirmation, e.g. "main.ts imports it: …" (null / "" for none).
+   * Addition to the original contract.
+   */
+  deleteWarning?(path: string): string | null;
   onSetEntry?(path: string): void;
   /** Files with unsaved / uncompiled changes (shown as a dot). */
   dirty?: ReadonlySet<string>;

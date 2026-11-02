@@ -114,8 +114,8 @@ export function validateMatchConfig(config: MatchConfig, opts: { maxConcurrency?
     problems.push(`Games at once must be from 1 to ${maxC}.`);
   }
   for (const p of config.participants) {
-    if (p.hashMb !== undefined && (!Number.isFinite(p.hashMb) || p.hashMb < 1 || p.hashMb > 1024)) {
-      problems.push("Hash sizes must be from 1 to 1024 MB.");
+    if (p.hashMb !== undefined && (!Number.isFinite(p.hashMb) || p.hashMb < 1 || p.hashMb > 512)) {
+      problems.push("Hash sizes must be from 1 to 512 MB.");
       break;
     }
   }

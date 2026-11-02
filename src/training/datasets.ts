@@ -136,7 +136,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       handle.writer = null;
       state = { ...state, status: summary.stopped ? "stopped" : "finished" };
       const stored = await deps.datasets.get(id);
-      deps.notify.toast(summary.stopped ? `Stopped generating "${dataset.name}"` : `Dataset "${dataset.name}" is ready`, {
+      deps.notify.toast(summary.stopped ? `Stopped generating “${dataset.name}”` : `Dataset “${dataset.name}” is ready`, {
         kind: summary.stopped ? "info" : "success",
         detail: `${formatCount(summary.positions)} new positions from ${summary.games} games${stored ? ` (${formatCount(stored.positions)} in total)` : ""}.`,
       });
@@ -145,7 +145,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       // Keep what was generated before the failure.
       if (writer) await writer.close().catch(() => writer?.dispose());
       state = { ...state, status: "error", error: message };
-      deps.notify.toast(`Generating "${dataset.name}" failed`, { kind: "error", detail: message });
+      deps.notify.toast(`Generating “${dataset.name}” failed`, { kind: "error", detail: message });
     } finally {
       handle.writer = null;
       clearInterval(activityTimer);
@@ -184,10 +184,10 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       if (opts.appendTo) {
         const existing = await deps.datasets.get(opts.appendTo);
         if (!existing) throw new Error("The dataset to add games to no longer exists.");
-        if (registry.isGenerating(existing.id)) throw new Error(`"${existing.name}" is already being generated.`);
+        if (registry.isGenerating(existing.id)) throw new Error(`“${existing.name}” is already being generated.`);
         // One writer per dataset, also across tabs (two writers would overwrite each other's chunks).
         lock = await deps.locks.acquire(datasetLockKey(existing.id));
-        if (!lock) throw new Error(`"${existing.name}" is being generated in another tab.`);
+        if (!lock) throw new Error(`“${existing.name}” is being generated in another tab.`);
         dataset = existing;
       } else {
         const name = (opts.name ?? "").trim();
@@ -262,7 +262,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
         if (report.positions === 0) {
           throw new Error(
             report.format === "text"
-              ? `No positions found. Use a .cbds file or text lines like "<FEN> | <score> | <result>".${report.problems.length ? ` First problem: ${report.problems[0]}.` : ""}`
+              ? `No positions found. Use a .cbds file or text lines like “<FEN> | <score> | <result>”.${report.problems.length ? ` First problem: ${report.problems[0]}.` : ""}`
               : "The file contains no valid positions.",
           );
         }
@@ -270,7 +270,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
         await deps.datasets.update(id, {
           description: `Imported from ${fileName} (${report.format === "cbds" ? ".cbds" : "text"}): ${report.positions.toLocaleString("en-US")} positions.${skipped ? ` ${skipped}` : ""}`,
         });
-        if (skipped) deps.notify.toast(`Imported "${name}" with problems`, { kind: "warn", detail: skipped });
+        if (skipped) deps.notify.toast(`Imported “${name}” with problems`, { kind: "warn", detail: skipped });
         return id;
       } catch (err) {
         writer?.dispose();
@@ -309,7 +309,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
       await deps.datasets.put({
         id,
         name: trimmed,
-        description: `Merged from ${sources.map((s) => `"${s.name}"`).join(", ")}.`,
+        description: `Merged from ${sources.map((s) => `“${s.name}”`).join(", ")}.`,
         createdAt: now,
         updatedAt: now,
         positions: 0,
@@ -386,7 +386,7 @@ export function createDatasetService(deps: ServiceDeps, registry: GenerationRegi
         throw new Error("This dataset is being generated in another tab. Stop the generation there first.");
       }
       const run = await hooks.usedByActiveRun(datasetId);
-      if (run) throw new Error(`The training run "${run}" is using this dataset. Pause or stop the run first.`);
+      if (run) throw new Error(`The training run “${run}” is using this dataset. Pause or stop the run first.`);
       await deps.datasets.remove(datasetId);
       if (getDatasetJob(datasetId)) clearDatasetJob(datasetId);
     },

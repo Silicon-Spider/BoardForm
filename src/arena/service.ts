@@ -16,6 +16,7 @@ import { gamesRepo, matchesRepo } from "@/storage/repos";
 import { whenSeeded } from "@/storage/seed";
 import type { MatchConfig, MatchRecord } from "@/types";
 import { clearActivity } from "@/app/activity";
+import { getEngineArtifacts, loadEngine } from "@/engine-host/build";
 import { normalizeMatchConfig, validateMatchConfig } from "./config";
 import { runEngineGame } from "./game";
 import { matchExtras, removeLiveMatch } from "./live";
@@ -46,17 +47,13 @@ function lockManager(): LockManager | null {
 
 // --- engines for the runner ---------------------------------------------------------------------
 
-// The engine host (compiler client, template sources, workers) is loaded on first use, so the
-// start-up bundle that calls initArenaService() stays small.
-const engineHost = () => import("@/engine-host");
-
+// A static import: the engine host is part of the start-up bundle anyway (the training service,
+// started next to this one, uses it), and its compiler and engine workers only load on first use.
 const engineDeps: RunnerDeps = {
   async prepare(engineId, onStatus) {
-    const { getEngineArtifacts } = await engineHost();
     await getEngineArtifacts(engineId, { onStatus });
   },
-  async load(engineId, opts) {
-    const { loadEngine } = await engineHost();
+  load(engineId, opts) {
     return loadEngine(engineId, { hashMb: opts.hashMb, label: opts.label, onLog: opts.onLog });
   },
 };
@@ -328,7 +325,6 @@ export function runningMatchIds(): string[] {
  */
 export async function playEngineGame(opts: PlayEngineGameOptions): Promise<PlayedGame> {
   if (opts.engines) return runEngineGame(opts, opts.engines);
-  const { loadEngine } = await engineHost();
   const white = await loadEngine(opts.white.engineId, { hashMb: opts.white.config.hashMb, label: opts.white.name });
   let black;
   try {

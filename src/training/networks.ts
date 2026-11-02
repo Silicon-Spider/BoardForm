@@ -44,7 +44,7 @@ export function createNetworkService(deps: ServiceDeps, hooks: NetworkServiceHoo
       return hit;
     }
     const data = await deps.networks.getData(id);
-    if (!data || !data.quantized || data.quantized.byteLength === 0) throw new Error(`The weights of the network "${rec.name}" are missing.`);
+    if (!data || !data.quantized || data.quantized.byteLength === 0) throw new Error(`The weights of the network “${rec.name}” are missing.`);
     const net = parseNetworkFile(data.quantized);
     parsed.set(key, net);
     while (parsed.size > PARSED_CACHE_SIZE) parsed.delete(parsed.keys().next().value as string);
@@ -131,14 +131,14 @@ export function createNetworkService(deps: ServiceDeps, hooks: NetworkServiceHoo
       const network = await deps.networks.get(networkId);
       if (!network) throw new Error("The network no longer exists.");
       const data = await deps.networks.getData(networkId);
-      if (!data || !data.quantized || data.quantized.byteLength === 0) throw new Error(`The weights of the network "${network.name}" are missing.`);
+      if (!data || !data.quantized || data.quantized.byteLength === 0) throw new Error(`The weights of the network “${network.name}” are missing.`);
       const { files, templateVersion } = deps.nnueEngineFiles();
       const id = deps.newId();
       const now = Date.now();
       const engine: EngineRecord = {
         id,
         name: (opts.name ?? "").trim() || network.name,
-        description: `The stock search with the NNUE evaluation, using the network "${network.name}" (hidden ${network.hidden}, ${ACTIVATION_NAMES[network.activation]}).`,
+        description: `The stock search with the NNUE evaluation, using the network “${network.name}” (hidden ${network.hidden}, ${ACTIVATION_NAMES[network.activation]}).`,
         kind: "nnue",
         createdAt: now,
         updatedAt: now,
@@ -166,7 +166,7 @@ export function createNetworkService(deps: ServiceDeps, hooks: NetworkServiceHoo
 
     async remove(networkId) {
       const run = await hooks.usedByActiveRun(networkId);
-      if (run) throw new Error(`The training run "${run}" is using this network. Pause or stop the run first.`);
+      if (run) throw new Error(`The training run “${run}” is using this network. Pause or stop the run first.`);
       await deps.networks.remove(networkId); // also deletes the weights (networkData)
     },
 

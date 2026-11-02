@@ -32,7 +32,11 @@ export interface EditorController {
   setWorkspace(workspace: object): boolean;
   /** Scrolls to a block and selects it. */
   focusBlock(id: string): void;
-  /** Delivers a pending (debounced) change immediately. */
+  /**
+   * Delivers the newest edit through onChange right now (synchronously), if the editor has one it
+   * has not reported yet — also an edit whose Blockly event is still queued, or a field that is
+   * being typed in. Does nothing when everything was already reported.
+   */
   flush(): void;
   /** Adds an Evaluation block (user action: undoable, reported through onChange). */
   addEvaluationBlock(): void;
@@ -119,7 +123,9 @@ export function mountBlocksEditor(container: HTMLElement, opts: MountOptions): E
     const result = generateEval(json);
     applyDiagnostics(result);
     opts.onDiagnostics(result);
-    const empty = ws.getTopBlocks(false).length === 0 && ws.getTopComments(false).length === 0;
+    // Blocks only: "Delete N Blocks" keeps workspace comments (like the starter's welcome note),
+    // and a leftover note must not hide the empty state's way back to a working evaluation.
+    const empty = ws.getTopBlocks(false).length === 0;
     if (empty !== lastEmpty) {
       lastEmpty = empty;
       opts.onEmptyChange?.(empty);
@@ -189,14 +195,24 @@ export function mountBlocksEditor(container: HTMLElement, opts: MountOptions): E
     scrollToStart();
   }
 
+  // Reports the workspace if it differs from what was last loaded or reported. It does not rely on
+  // the debounce timer alone: Blockly delivers change events asynchronously (on a later tick), so
+  // right after an edit no timer may be running yet although the blocks already changed. Comparing
+  // serializations catches that (and a number being typed, which Blockly applies as you type).
   function flush(): void {
-    if (!timer || disposed) return;
-    clearTimeout(timer);
-    timer = null;
+    if (disposed || loading || opts.readOnly) return;
+    const pending = timer !== null;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
     const json = save();
     const text = JSON.stringify(json);
+    if (text === lastText) {
+      if (pending) regenerate(json); // e.g. an edit that was undone: refresh the diagnostics anyway
+      return;
+    }
     const result = regenerate(json);
-    if (text === lastText) return;
     lastText = text;
     lastEmitted = json;
     recentTexts.push(text);

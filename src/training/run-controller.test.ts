@@ -103,7 +103,7 @@ describe("training runs", () => {
     expect(lab.training.isActive(id)).toBe(false);
     expect(deps.notify.activityIds.has(`training:${id}`)).toBe(true);
     expect(deps.notify.activities.has(`training:${id}`)).toBe(false);
-    expect(deps.notify.toasts.at(-1)).toMatchObject({ kind: "success", message: 'Training run "Test run" finished' });
+    expect(deps.notify.toasts.at(-1)).toMatchObject({ kind: "success", message: "Training run “Test run” finished" });
     expect(ScriptedTrainer.jobs[0]).toMatchObject({ datasetIds: ["ds"], resume: null, checkpointEverySteps: 2, hyper: { seed: 7, threads: 1 } });
   });
 
@@ -349,7 +349,7 @@ describe("training runs", () => {
     await tabB.init(); // idempotent
     expect(tabB.training.isActive(auto)).toBe(true);
     expect(tabB.training.activeRunIds()).toEqual([auto]);
-    expect(deps.notify.toasts.some((t) => t.message === 'Resumed the training run "Auto"')).toBe(true);
+    expect(deps.notify.toasts.some((t) => t.message === "Resumed the training run “Auto”")).toBe(true);
     const m = await run(manual);
     expect(m.status).toBe("paused");
     expect(m.log.at(-1)).toMatchObject({ level: "warn", message: "Interrupted when the tab was closed" });

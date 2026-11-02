@@ -520,7 +520,7 @@ export function BoardEditor({ fen, onChange, orientation = "white", className }:
               <Icon name={status.ok ? "check" : "alert"} size={14} />
               <span>
                 {status.text}
-                {!status.ok && status.source === "board" && <span className="faint"> — not saved until fixed</span>}
+                {!status.ok && status.source === "board" && <span className="faint"> (not saved until fixed)</span>}
               </span>
             </div>
           </div>

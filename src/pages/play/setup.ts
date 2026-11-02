@@ -142,7 +142,8 @@ export function checkStart(start: StartPosition): string | null {
   if (start.kind === "fen") {
     if (!start.fen.trim()) return "Enter a FEN or choose another start position.";
     const v = validateFen(start.fen);
-    if (!v.ok) return `The FEN is not valid: ${v.error ?? "unknown problem"}.`;
+    // validateFen's messages are sentences of their own ("Rank 3 has 7 squares — it needs 8").
+    if (!v.ok) return `The FEN is not valid. ${v.error ?? "Unknown problem"}.`;
     const game = new ChessGame(start.fen);
     const outcome = game.outcome();
     if (outcome) return `The game is already over in that position (${outcome.termination.replace(/-/g, " ")}).`;
@@ -209,11 +210,12 @@ export type PresetId = "human-white" | "human-black" | "engines" | "blitz";
 export const PRESETS: ReadonlyArray<{ id: PresetId; label: string; detail: string }> = [
   { id: "human-white", label: "You vs engine", detail: "You play White · engine 1 s per move" },
   { id: "human-black", label: "You vs engine", detail: "You play Black · engine 1 s per move" },
-  { id: "blitz", label: "Blitz 5+3", detail: "You play White · both on a 5+3 clock" },
+  { id: "blitz", label: "Blitz 3+2", detail: "You play White · both on a 3+2 clock" },
   { id: "engines", label: "Engine vs engine", detail: "Watch two engines · 1 s per move" },
 ];
 
-export const BLITZ_CLOCK: TimeControl = { baseMs: 300_000, incMs: 3_000 };
+/** The quick start's blitz clock: the clock editors' "3+2 · Blitz" preset. */
+export const BLITZ_CLOCK: TimeControl = { baseMs: 180_000, incMs: 2_000 };
 
 /** The setup for a quick preset. Engines: the ones already chosen, else sensible defaults. */
 export function applyPreset(setup: GameSetup, preset: PresetId, engines: readonly EngineRecord[]): GameSetup {
@@ -321,7 +323,7 @@ export function intentFromQuery(query: URLSearchParams, base: GameSetup, engines
   if (fen) {
     const v = validateFen(fen);
     if (v.ok) fenOk = true;
-    else intent.problems.push(`The position in the link is not a valid FEN: ${v.error ?? "unknown problem"}.`);
+    else intent.problems.push(`The position in the link is not a valid FEN. ${v.error ?? "Unknown problem"}.`);
   }
 
   const gameId = query.get("game");

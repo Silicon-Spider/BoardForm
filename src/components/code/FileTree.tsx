@@ -235,7 +235,7 @@ function Menu({ state, onClose }: { state: MenuState; onClose(focusRow: boolean)
 
 /** File tree with folders, status badges and file actions. Keyboard accessible. */
 export function FileTree(props: FileTreeProps): JSX.Element {
-  const { files, active, entry, readOnly, onSelect, onCreate, onRename, onDelete, onSetEntry, dirty, errorCounts, className } = props;
+  const { files, active, entry, readOnly, onSelect, onCreate, onRename, onDelete, deleteWarning, onSetEntry, dirty, errorCounts, className } = props;
   const confirm = useConfirm();
   const tree = useMemo(() => buildFileTree(files), [files]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
@@ -329,9 +329,10 @@ export function FileTree(props: FileTreeProps): JSX.Element {
     // Where keyboard focus goes afterwards: the row below (or above) the deleted one.
     const index = rows.findIndex((r) => r.key === "f:" + path);
     const neighbour = rows[index + 1]?.key ?? rows[index - 1]?.key ?? null;
+    const warning = deleteWarning?.(path);
     const ok = await confirm({
       title: `Delete ${name}?`,
-      message: `${path} will be removed from this engine. This can't be undone.`,
+      message: `${path} will be removed from this engine. This can't be undone.${warning ? ` ${warning}` : ""}`,
       confirmLabel: "Delete file",
       danger: true,
     });

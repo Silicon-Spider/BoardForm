@@ -185,6 +185,35 @@ describe("CodeEditor", () => {
     expect(text()).not.toContain("zzz");
   });
 
+  it("adds the first import to a file without imports only when it knows where the template is", () => {
+    const popcount = ENGINE_API.find((e) => e.name === "popcount" && e.module === "bitboard")!;
+    const value = "// pawns.ts\n//\n// Helpers for my evaluation.\n\n";
+    editor({ value, documentId: "lib/pawns.ts" });
+    act(() => view().dispatch({ selection: { anchor: value.length } }));
+    // Without importBase it does not guess (scratch engines have no template modules).
+    editor({ value, documentId: "lib/pawns.ts", insert: { text: "popcount()", entry: popcount, nonce: 1 } });
+    expect(text()).toBe(value + "popcount()");
+    act(() => view().dispatch({ changes: { from: 0, to: view().state.doc.length, insert: value }, selection: { anchor: value.length } }));
+    editor({ value, documentId: "lib/pawns.ts", importBase: "../", insert: { text: "popcount()", entry: popcount, nonce: 2 } });
+    expect(text()).toBe('// pawns.ts\n//\n// Helpers for my evaluation.\n\nimport { popcount } from "../bitboard";\n\npopcount()');
+  });
+
+  it("tells the parent when someone tries to type into a read-only document", () => {
+    const onReadOnlyEdit = vi.fn();
+    editor({ value: "fixed", readOnly: true, onReadOnlyEdit });
+    const content = container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => {
+      content.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true, cancelable: true }));
+    });
+    expect(onReadOnlyEdit).toHaveBeenCalledTimes(1);
+    // Navigation keys are fine.
+    act(() => {
+      content.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    });
+    expect(onReadOnlyEdit).toHaveBeenCalledTimes(1);
+    expect(text()).toBe("fixed");
+  });
+
   it("calls onSave on Ctrl+S and suppresses the browser's save dialog", () => {
     const onSave = vi.fn();
     editor({ value: "x", onSave });

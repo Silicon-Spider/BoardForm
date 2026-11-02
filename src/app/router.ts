@@ -14,6 +14,15 @@ export interface PageProps {
   query: URLSearchParams;
 }
 
+/** decodeURIComponent that keeps a malformed escape ("%E0") as typed instead of throwing. */
+function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
 function parseHash(hash: string): Route {
   let raw = hash.startsWith("#") ? hash.slice(1) : hash;
   if (!raw.startsWith("/")) raw = "/" + raw;
@@ -23,7 +32,7 @@ function parseHash(hash: string): Route {
   const normalized = path.length > 1 ? path.replace(/\/+$/, "") : path;
   return {
     path: normalized || "/",
-    segments: normalized.split("/").filter(Boolean).map(decodeURIComponent),
+    segments: normalized.split("/").filter(Boolean).map(safeDecode),
     query: new URLSearchParams(search),
   };
 }
@@ -81,7 +90,7 @@ export function matchPath(pattern: string, path: string): Record<string, string>
   if (p.length !== s.length) return null;
   const params: Record<string, string> = {};
   for (let i = 0; i < p.length; i++) {
-    if (p[i].startsWith(":")) params[p[i].slice(1)] = decodeURIComponent(s[i]);
+    if (p[i].startsWith(":")) params[p[i].slice(1)] = safeDecode(s[i]);
     else if (p[i] !== s[i]) return null;
   }
   return params;

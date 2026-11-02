@@ -30,6 +30,9 @@ import { SetupPanel } from "./SetupPanel";
 import { SIDES, type GameSetup, type PersistedGame, type ResolvedStart, type Side } from "./types";
 import "./play.css";
 
+/** Settings key of the new-game form (the last setup used). */
+const LAST_SETUP_KEY = "play.lastSetup";
+
 type Mode = "play" | "analysis";
 type SideTab = "main" | "games";
 
@@ -85,7 +88,7 @@ export default function PlayPage({ query }: PageProps) {
   const [prefs] = useBoardPreferences();
   const [defaultHashMb] = useDefaultHashMb();
   const [mode, setMode] = useSetting<Mode>("play.mode", "play");
-  const [storedSetup, setStoredSetup] = useSetting<unknown>("play.lastSetup", DEFAULT_SETUP);
+  const [storedSetup, setStoredSetup] = useSetting<unknown>(LAST_SETUP_KEY, DEFAULT_SETUP);
   const setup = useMemo(() => withDefaultEngines(normalizeSetup(storedSetup), engines), [storedSetup, engines]);
   const [moveDelay, setMoveDelay] = useSetting<number>("play.moveDelayMs", 400);
   const [showEval, setShowEval] = useSetting<boolean>("play.showEvalBar", true);
@@ -272,16 +275,18 @@ export default function PlayPage({ query }: PageProps) {
     handledQuery.current = queryKey;
     const params = new URLSearchParams(queryKey);
     void (async () => {
-      const list = await withLinkedEngines(params, engines);
+      // The last setup is read from the database here: the page may not have loaded it yet (or not
+      // the latest version), and a link builds on it and then stores the result as the new setup.
+      const [list, stored] = await Promise.all([withLinkedEngines(params, engines), settingsRepo.get<unknown>(LAST_SETUP_KEY, DEFAULT_SETUP)]);
       setQuery(Object.fromEntries(QUERY_KEYS.map((k) => [k, null])));
-      handleLink(params, list);
+      handleLink(params, list, withDefaultEngines(normalizeSetup(stored), list));
     })();
     // Only when the query changes (or once the data it needs has loaded).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restoreDone, engines === undefined, queryKey]);
 
-  function handleLink(query: URLSearchParams, list: readonly EngineRecord[]) {
-    const intent = intentFromQuery(query, setup, list);
+  function handleLink(query: URLSearchParams, list: readonly EngineRecord[], base: GameSetup) {
+    const intent = intentFromQuery(query, base, list);
     setLinkProblems(intent.problems);
     if (intent.gameId) {
       const id = intent.gameId;

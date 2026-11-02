@@ -34,7 +34,7 @@ Click **New engine** on the [Engines](#/engines) page and choose how you want to
 
 All engines that you build inside the app are written in **AssemblyScript**, a language that looks like TypeScript and compiles to WebAssembly. You don't need to know it to use the Blocks editor; the [Evaluation code](#/help/eval-api?section=assemblyscript-for-typescript-users) topic explains what is different from TypeScript when you start writing code.
 
-> **Tip** Not sure where to start? Open **Blocky**, change a bonus, and play a game against the old version. That one loop teaches you most of the app.
+> **Tip** Not sure where to start? **Duplicate** Blocky (its card's **⋯** menu → **Duplicate**), change a bonus in the copy, and play the copy against the original Blocky. That one loop teaches you most of the app.
 
 ## The build, test, play, match loop
 

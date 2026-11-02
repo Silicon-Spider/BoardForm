@@ -27,7 +27,7 @@
 }
 .dev-nav a.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 @media (max-width: 700px) {
   .dev-nav {

@@ -8,7 +8,7 @@ If you only want to change how positions are judged, an [Eval code](#/help/eval-
 
 There are two ways to get one: choose **Full engine code** in the **New engine** wizard on the [Engines](#/engines) page, or open an Eval code or NNUE engine in the Workshop and pick **Unlock the full engine source** from the **⋯** menu — that creates a new engine with every file of the template plus your `eval.ts`, and leaves the original untouched.
 
-The Workshop shows a Full code engine's files on the left. The **File** menu creates files (**New file…**, use `/` for folders, such as `lib/pawns.ts`), renames them, sets the **entry file** the compiler starts from (normally `main.ts`), resets a file to the template's version and deletes files. The **API reference** tab lists every function of the template, with **Insert** for snippets.
+The Workshop shows a Full code engine's files on the left. The **File** menu creates files (**New file…**, use `/` for folders, such as `lib/pawns.ts`), renames them, sets the **entry file** the compiler starts from (normally `main.ts`), resets a file to the template's version and deletes files. Renaming a file also updates the imports that point to it; deleting one warns you when another file still imports it. The **API reference** tab lists every function of the template, with **Insert** for snippets. The keyboard button next to the **File** menu lists the editor's shortcuts (find and replace, go to line, next error, …).
 
 ## The file map
 

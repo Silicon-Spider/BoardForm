@@ -50,14 +50,14 @@ export async function validateRunConfig(config: TrainingRunConfig, src: Validati
   } else if (n.mode === "continue" || n.mode === "widen") {
     const rec = isId(n.networkId) ? await src.network(n.networkId) : undefined;
     if (!rec) problems.push(`The network to ${n.mode === "continue" ? "continue training" : "widen"} no longer exists. Choose another one.`);
-    else if (!(await src.networkHasData(rec.id))) problems.push(`The weights of the network "${rec.name}" are missing. Import it again or choose another network.`);
+    else if (!(await src.networkHasData(rec.id))) problems.push(`The weights of the network “${rec.name}” are missing. Import it again or choose another network.`);
     else sourceExists = true;
     if (n.mode === "widen") {
       if (!isValidHidden(n.newHidden)) problems.push(`The new hidden size must be a multiple of 8 between ${MIN_HIDDEN} and ${fmt(MAX_HIDDEN)} (got ${String(n.newHidden)}).`);
       else if (rec && n.newHidden <= rec.hidden) problems.push(`Widening needs a larger hidden size than the network's current ${rec.hidden} (got ${n.newHidden}).`);
     }
   } else {
-    problems.push(`Unknown network mode "${String((n as { mode?: unknown }).mode)}".`);
+    problems.push(`Unknown network mode “${String((n as { mode?: unknown }).mode)}”.`);
   }
 
   // --- data ---

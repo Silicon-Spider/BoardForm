@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- BoardForm mark: a knight on a board square (two darker quarters hint at the checkerboard). -->
+  <defs>
+    <linearGradient id="bf-tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b9cf5"/>
+      <stop offset="1" stop-color="#2f6fdc"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#bf-tile)"/>
+  <path fill="#0b1f4a" fill-opacity="0.16" d="M16 0H25A7 7 0 0 1 32 7V16H16ZM0 16H16V32H7A7 7 0 0 1 0 25Z"/>
+  <path fill="#fff" d="M9.6 25.5C9.6 22.4 11.5 20.3 14.2 17.9C12.4 18.7 10.4 19.5 8.6 19.3C7.2 19.2 6.2 18.2 6.2 17C6.2 16.2 6.6 15.6 7.2 14.9L11.2 10.2C11.8 9.4 12.6 8.6 13.4 8L14.6 4.4L16.8 7.3C21.6 8.4 25 12.8 25 18.6C25 21 24.7 23.3 24.3 25.5Z"/>
+  <rect x="7.2" y="24.3" width="19.2" height="3.4" rx="1.4" fill="#fff"/>
+  <circle cx="13" cy="11.7" r="1" fill="#3b7ff0"/>
+</svg>

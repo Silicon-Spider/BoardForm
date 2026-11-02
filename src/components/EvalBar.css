@@ -66,3 +66,11 @@
 .cb-evalbar-label.on-black {
   color: #f2f2ef;
 }
+/* A finished game (checkmate / stalemate on the board): the result replaces the score. */
+.cb-evalbar--final .cb-evalbar-mid {
+  display: none;
+}
+.cb-evalbar--final .cb-evalbar-label {
+  font-size: 9.5px;
+  letter-spacing: -0.04em;
+}

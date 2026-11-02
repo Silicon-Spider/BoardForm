@@ -7,8 +7,9 @@ import { Modal } from "@/components";
 import { arena } from "@/arena";
 import { errorMessage } from "@/pages/engines/actions";
 import { PageIcon } from "@/pages/engines/icons";
-import { clearAllData, datasetsRepo, ensureSeeded, matchesRepo } from "@/storage";
+import { STARTER_NNUE_ENGINE_ID, clearAllData, datasetsRepo, enginesRepo, ensureSeeded, matchesRepo } from "@/storage";
 import { datasets, training } from "@/training";
+import { clearLocalAppData } from "@/utils/localData";
 import { SettingRow, SettingsSection } from "./controls";
 
 const CONFIRM_WORD = "DELETE";
@@ -70,21 +71,32 @@ function DeleteAllDialog({ onClose, onDeleted }: { onClose: () => void; onDelete
       await stopBackgroundWork();
       setPhase("deleting");
       await clearAllData();
+      // localStorage holds crash-recovery copies (Workshop drafts, the Play snapshot) that could
+      // otherwise bring a deleted engine's edits or game back. The colour theme is kept.
+      clearLocalAppData();
     } catch (err) {
       setError(errorMessage(err));
       setPhase("idle");
       return;
     }
     let reseeded = true;
+    let neuron = false;
     try {
       await ensureSeeded();
+      // ensureSeeded() does not fail when the starter network cannot be downloaded (offline): it
+      // tries again on the next start. Neuron is added together with that network.
+      neuron = (await enginesRepo.get(STARTER_NNUE_ENGINE_ID)) !== undefined;
     } catch (err) {
       reseeded = false;
       console.error("Could not re-create the starter engines", err);
     }
     toast("All data deleted", {
       kind: "success",
-      detail: reseeded ? "The starter engines Blocky, Classic, Sprout and Neuron are back." : "The starter engines could not be re-created — use Restore starter engines.",
+      detail: !reseeded
+        ? "The starter engines could not be re-created — use Restore starter engines."
+        : neuron
+          ? "The starter engines Blocky, Classic, Sprout and Neuron are back."
+          : "The starter engines Blocky, Classic and Sprout are back. Neuron and its network could not be downloaded; they are added the next time you open BoardForm online.",
     });
     onDeleted();
   };

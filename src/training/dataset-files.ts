@@ -62,7 +62,7 @@ const yieldNow = () => new Promise<void>((r) => setTimeout(r, 0));
 export async function readCbds(file: Blob, sink: PositionSink): Promise<ImportReport> {
   if (file.size < CBDS_HEADER_SIZE) throw new DatasetFileError(`The file is too small to be a .cbds dataset (${file.size} bytes).`);
   const header = new Uint8Array(await file.slice(0, CBDS_HEADER_SIZE).arrayBuffer());
-  if (!hasCbdsMagic(header)) throw new DatasetFileError('Not a .cbds dataset (it does not start with "CBDS").');
+  if (!hasCbdsMagic(header)) throw new DatasetFileError('Not a .cbds dataset (it does not start with “CBDS”).');
   const dv = new DataView(header.buffer);
   const version = dv.getUint32(4, true);
   if (version !== CBDS_VERSION) throw new DatasetFileError(`Unsupported .cbds version ${version} (this app reads version ${CBDS_VERSION}).`);
@@ -116,13 +116,13 @@ function parseResult(text: string): PackedResult | null {
  */
 export function parseTextLine(line: string, out: Uint8Array, offset: number): string | null {
   const parts = line.split("|");
-  if (parts.length !== 3) return `expected "FEN | score | result" (found ${parts.length} field${parts.length === 1 ? "" : "s"})`;
+  if (parts.length !== 3) return `expected “FEN | score | result” (found ${parts.length} field${parts.length === 1 ? "" : "s"})`;
   const fen = (parts[0] as string).trim();
   const scoreText = (parts[1] as string).trim();
-  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(scoreText)) return `invalid score "${scoreText.slice(0, 20)}"`;
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)$/.test(scoreText)) return `invalid score “${scoreText.slice(0, 20)}”`;
   const score = Number(scoreText);
   const result = parseResult(parts[2] as string);
-  if (result === null) return `invalid result "${(parts[2] as string).trim().slice(0, 20)}" (use 1.0, 0.5 or 0.0)`;
+  if (result === null) return `invalid result “${(parts[2] as string).trim().slice(0, 20)}” (use 1.0, 0.5 or 0.0)`;
   let pieces: number;
   try {
     pieces = parseFenBoard(fen).pieces.length;

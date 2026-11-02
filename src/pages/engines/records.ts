@@ -5,7 +5,7 @@ import { DEFAULT_WORKSPACE } from "@/blocks/default-workspace";
 import { GENERATOR_VERSION, generateEvalSource } from "@/blocks/generator";
 import { TEMPLATE_VERSION, defaultFilesFor, scratchFiles } from "@/engine-host/templates";
 import { deepEqual } from "@/storage/equal";
-import type { EngineKind, EngineRecord } from "@/types";
+import type { EngineKind, EngineRecord, NetworkRecord } from "@/types";
 
 /** The ways to start an engine offered by the new-engine wizard (an engine kind, or a copy). */
 export type Approach = EngineKind | "copy";
@@ -113,6 +113,20 @@ export function suggestName(approach: Approach, taken: readonly string[], hints:
     return uniqueName(`${hints.networkName.trim()} engine`.slice(0, MAX_NAME_LENGTH), taken);
   }
   return uniqueName(BASE_NAMES[approach], taken);
+}
+
+/**
+ * The network a new NNUE engine starts with until the user picks one: the newest network that has
+ * been trained (the starter network on a fresh install). Untrained networks (random weights) play
+ * no better than the fallback evaluation, so they are never the default. Null = none.
+ */
+export function defaultNetworkId(networks: readonly NetworkRecord[] | undefined): string | null {
+  let best: NetworkRecord | null = null;
+  for (const n of networks ?? []) {
+    if ((n.stats?.positionsSeen ?? 0) <= 0) continue;
+    if (!best || n.createdAt > best.createdAt) best = n;
+  }
+  return best?.id ?? null;
 }
 
 /** Accent colours offered for engines (cards, charts, arena standings). */

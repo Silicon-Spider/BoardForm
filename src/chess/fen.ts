@@ -127,67 +127,142 @@ interface FenCheck {
   chess?: Chess;
 }
 
-/** Validation shared by validateFen and ChessGame (returns the loaded chess.js instance). */
+const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+const FIELD_NAMES = "pieces, side to move, castling, en passant, half-move clock and move number";
+
+/** Shows a user's text in a message, shortened so a pasted essay doesn't flood the UI. */
+function quote(text: string): string {
+  return `"${text.length > 24 ? text.slice(0, 22) + "…" : text}"`;
+}
+
+/**
+ * Field 1 (piece placement): 8 ranks, 8 squares each, known piece letters, one king per side,
+ * no pawns on the back ranks. Returns a message, or null when it is fine.
+ */
+function placementProblem(placement: string): string | null {
+  const rows = placement.split("/");
+  if (rows.length !== 8) {
+    return `The board needs 8 ranks separated by "/" — this one has ${rows.length}`;
+  }
+  for (let i = 0; i < 8; i++) {
+    const rank = 8 - i; // FEN lists rank 8 first
+    const row = rows[i];
+    let squares = 0;
+    let previousDigit = "";
+    for (const ch of row) {
+      if (ch >= "0" && ch <= "9") {
+        if (ch === "0" || ch === "9") return `Rank ${rank} has "${ch}" — a number counts empty squares, from 1 to 8`;
+        if (previousDigit) return `Rank ${rank} has two numbers in a row ("${previousDigit}${ch}") — write empty squares as one number`;
+        squares += Number(ch);
+        previousDigit = ch;
+      } else if ("pnbrqkPNBRQK".includes(ch)) {
+        squares++;
+        previousDigit = "";
+      } else {
+        return `Unknown piece letter "${ch}" in rank ${rank} — use K Q R B N P for White, k q r b n p for Black`;
+      }
+    }
+    if (squares !== 8) return `Rank ${rank} has ${squares} ${squares === 1 ? "square" : "squares"} — it needs 8`;
+  }
+  for (const [letter, name] of [
+    ["K", "white"],
+    ["k", "black"],
+  ] as const) {
+    const count = placement.split(letter).length - 1;
+    if (count === 0) return `There is no ${name} king — each side needs exactly one`;
+    if (count > 1) return `There are ${count} ${name} kings — each side needs exactly one`;
+  }
+  const board = parseFenBoard(placement);
+  for (const index of [...Array(8).keys()].flatMap((f) => [f, 56 + f])) {
+    const piece = board[index];
+    if (piece === "wP" || piece === "bP") {
+      return `There is a ${piece === "wP" ? "white" : "black"} pawn on ${squareName(index)} — pawns can't stand on the 1st or 8th rank`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Validation shared by validateFen and ChessGame (returns the loaded chess.js instance).
+ * Checks the fields in order, each with a message that says what is wrong and how to fix it.
+ */
 export function checkFen(input: string): FenCheck {
   const fen = normalizeFen(input);
+  const fail = (error: string): FenCheck => ({ ok: false, fen, error });
   const fields = fen.split(" ");
   if (fields.length !== 6) {
-    return { ok: false, fen, error: "A FEN has six fields: pieces, side to move, castling, en passant, halfmove clock, move number" };
+    return fail(`This has ${fields.length} fields separated by spaces — a FEN has 6: ${FIELD_NAMES}`);
   }
-  const base = chessJsValidateFen(fen);
-  if (!base.ok) return { ok: false, fen, error: friendly(base.error) };
+  const [placement, side, castling, ep, halfmove, fullmove] = fields;
 
+  const placementError = placementProblem(placement);
+  if (placementError) return fail(placementError);
+
+  if (side !== "w" && side !== "b") return fail(`The side to move (2nd field) must be "w" or "b", not ${quote(side)}`);
+  const turn: Color = side;
   const board = parseFenBoard(fen);
-  const turn: Color = fields[1] === "b" ? "b" : "w";
 
   // Castling rights must match the pieces (chess.js trusts them blindly and would move a
   // non-existent rook).
-  if (fields[2] !== "-") {
-    if (/[^KQkq]/.test(fields[2])) return { ok: false, fen, error: "Castling availability is invalid" };
-    if (new Set(fields[2]).size !== fields[2].length) return { ok: false, fen, error: "Castling field repeats a right" };
-    for (const right of fields[2].split("") as Array<"K" | "Q" | "k" | "q">) {
+  if (castling !== "-") {
+    if (!/^[KQkq]+$/.test(castling)) {
+      return fail(`Castling rights (3rd field) must be "-" or letters from KQkq, not ${quote(castling)}`);
+    }
+    const repeated = castling.split("").find((c, i) => castling.indexOf(c) !== i);
+    if (repeated) return fail(`Castling right "${repeated}" appears twice`);
+    for (const right of castling.split("") as Array<"K" | "Q" | "k" | "q">) {
       if (!castlingPossible(board, right)) {
         const [kingSq, rookSq, color] = CASTLING_SQUARES[right];
-        return {
-          ok: false,
-          fen,
-          error: `Castling right "${right}" needs the ${COLOR_NAME[color].toLowerCase()} king on ${kingSq} and a rook on ${rookSq}`,
-        };
+        return fail(`Castling right "${right}" needs the ${COLOR_NAME[color].toLowerCase()} king on ${kingSq} and a rook on ${rookSq}`);
       }
     }
   }
 
   // En-passant square must sit behind a pawn that just advanced two squares.
-  if (fields[3] !== "-") {
-    const ep = squareIndex(fields[3]);
+  if (ep !== "-") {
+    const epIndex = squareIndex(ep);
+    if (epIndex < 0) return fail(`The en-passant square (4th field) must be "-" or a square such as e3, not ${quote(ep)}`);
+    const targetRank = turn === "w" ? 6 : 3;
+    if (Number(ep[1]) !== targetRank) {
+      return fail(`With ${COLOR_NAME[turn]} to move, the en-passant square must be on the ${ORDINAL[targetRank - 1]} rank (or "-"), not ${ep}`);
+    }
     const dir = turn === "w" ? -8 : 8; // from the target square towards the pawn
     const pawn: PieceCode = turn === "w" ? "bP" : "wP";
-    const origin = ep - dir;
-    if (ep < 0 || board[ep] !== null || board[ep + dir] !== pawn || board[origin] !== null) {
-      return {
-        ok: false,
-        fen,
-        error: `En-passant square ${fields[3]} needs a ${turn === "w" ? "black" : "white"} pawn on ${squareName(ep + dir)} that just moved two squares`,
-      };
+    if (board[epIndex] !== null || board[epIndex + dir] !== pawn || board[epIndex - dir] !== null) {
+      return fail(`En-passant square ${ep} needs a ${turn === "w" ? "black" : "white"} pawn on ${squareName(epIndex + dir)} that just moved two squares`);
     }
   }
 
+  if (!/^\d+$/.test(halfmove)) {
+    return fail(`The half-move clock (5th field) must be a whole number, 0 or more, not ${quote(halfmove)}`);
+  }
+  if (!/^\d+$/.test(fullmove) || Number(fullmove) < 1) {
+    return fail(`The move number (6th field) must be a whole number, 1 or more, not ${quote(fullmove)}`);
+  }
+
+  // Safety net: everything chess.js checks has been checked above.
+  const base = chessJsValidateFen(fen);
+  if (!base.ok) return fail(friendly(base.error));
   let chess: Chess;
   try {
     chess = new Chess(fen);
   } catch (e) {
-    return { ok: false, fen, error: friendly(e instanceof Error ? e.message : String(e)) };
+    return fail(friendly(e instanceof Error ? e.message : String(e)));
   }
 
   // The side that just moved may not have left its king in check.
   const other: Color = turn === "w" ? "b" : "w";
   const kingSquare = chess.findPiece({ type: "k", color: other })[0];
+  const ownKing = chess.findPiece({ type: "k", color: turn })[0];
+  if (kingSquare && ownKing) {
+    const a = squareIndex(kingSquare);
+    const b = squareIndex(ownKing);
+    if (Math.abs((a & 7) - (b & 7)) <= 1 && Math.abs((a >> 3) - (b >> 3)) <= 1) {
+      return fail(`The kings can't stand next to each other (${ownKing} and ${kingSquare})`);
+    }
+  }
   if (kingSquare && chess.isAttacked(kingSquare, turn)) {
-    return {
-      ok: false,
-      fen,
-      error: `${COLOR_NAME[other]} is in check but it is ${COLOR_NAME[turn]}'s turn`,
-    };
+    return fail(`${COLOR_NAME[other]} is in check but it is ${COLOR_NAME[turn]}'s turn — the side that just moved can't be in check`);
   }
   return { ok: true, fen, chess };
 }

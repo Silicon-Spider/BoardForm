@@ -4,7 +4,7 @@
 import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useBoardProps } from "@/app/preferences";
 import { toast } from "@/app/toast";
-import { ChessGame, START_FEN, normalizeFen, validateFen, type MoveInput } from "@/chess";
+import { ChessGame, START_FEN, mirrorFen, normalizeFen, validateFen, type MoveInput } from "@/chess";
 import { BoardEditor, Chessboard, Icon, Modal, Tabs, type ChessboardArrow } from "@/components";
 import { fenShapeProblem, sideOf } from "../format";
 import { PRESET_POSITIONS } from "../positions";
@@ -228,7 +228,13 @@ export const TestBench = memo(function TestBench({ session, family, visible, onS
               </>
             }
             align="left"
-            items={PRESET_POSITIONS.map((p) => ({ id: p.id, label: p.name, hint: p.hint, onSelect: () => setPosition(p.fen) }))}
+            items={[
+              ...PRESET_POSITIONS.map((p) => ({ id: p.id, label: p.name, hint: p.hint, onSelect: () => setPosition(p.fen) })),
+              "separator" as const,
+              // Checks symmetry in one click: the breakdown of the mirrored position should be the
+              // same with White and Black swapped (blocks evaluations are symmetric by construction).
+              { id: "mirror", label: "Swap colours", hint: "This position with White and Black swapped: a symmetric evaluation gives the opposite score", onSelect: () => setPosition(mirrorFen(fen)) },
+            ]}
           />
           <button
             type="button"

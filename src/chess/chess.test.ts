@@ -58,6 +58,50 @@ describe("FEN helpers", () => {
     expect(validateFen("4k3/8/8/8/8/8/8/4K3 w K- - 0 1").ok).toBe(false);
   });
 
+  it("explains each kind of invalid FEN accurately", () => {
+    const err = (fen: string) => {
+      const r = validateFen(fen);
+      expect(r.ok, fen).toBe(false);
+      return r.error ?? "";
+    };
+    // Field count and the piece placement field.
+    expect(err("not a fen")).toBe('The board needs 8 ranks separated by "/" — this one has 1');
+    expect(err("8/8/8/8")).toMatch(/needs 8 ranks .* has 4/);
+    expect(err("rnbqkbnr/pppppppp/8/8/8/7/PPPPPPPP/RNBQKBNR w KQkq - 0 1")).toBe("Rank 3 has 7 squares — it needs 8");
+    expect(err("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNRR w KQkq - 0 1")).toBe("Rank 1 has 9 squares — it needs 8");
+    expect(err("rnbqkbnr/ppppxppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")).toMatch(/^Unknown piece letter "x" in rank 7/);
+    expect(err("rnbqkbnr/pppppppp/44/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")).toMatch(/^Rank 6 has two numbers in a row \("44"\)/);
+    expect(err("rnbqkbnr/pppppppp/9/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")).toMatch(/^Rank 6 has "9"/);
+    expect(err("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 extra")).toMatch(/^This has 7 fields .* a FEN has 6/);
+    // Kings and pawns.
+    expect(err("8/8/8/8/8/8/8/4K3 w - - 0 1")).toBe("There is no black king — each side needs exactly one");
+    expect(err("4k3/8/8/8/8/8/8/8 w - - 0 1")).toMatch(/^There is no white king/);
+    expect(err("4k3/8/8/8/8/8/8/2K1K3 w - - 0 1")).toMatch(/^There are 2 white kings/);
+    expect(err("4k2P/8/8/8/8/8/8/4K3 w - - 0 1")).toBe("There is a white pawn on h8 — pawns can't stand on the 1st or 8th rank");
+    expect(err("4k3/8/8/8/8/8/8/p3K3 w - - 0 1")).toMatch(/black pawn on a1/);
+    // Side to move.
+    expect(err("4k3/8/8/8/8/8/8/4K3 x - - 0 1")).toBe('The side to move (2nd field) must be "w" or "b", not "x"');
+    // Castling.
+    expect(err("4k3/8/8/8/8/8/8/4K3 w K- - 0 1")).toMatch(/^Castling rights \(3rd field\) must be "-" or letters from KQkq, not "K-"/);
+    expect(err("r3k2r/8/8/8/8/8/8/R3K2R w KKq - 0 1")).toBe('Castling right "K" appears twice');
+    expect(err("4k3/8/8/8/8/8/8/4K3 w K - 0 1")).toBe('Castling right "K" needs the white king on e1 and a rook on h1');
+    // En passant.
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - e9 0 1")).toMatch(/^The en-passant square \(4th field\) must be "-" or a square/);
+    expect(err("4k3/8/8/8/4P3/8/8/4K3 w - e3 0 1")).toMatch(/^With White to move, the en-passant square must be on the 6th rank/);
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - e6 0 1")).toBe("En-passant square e6 needs a black pawn on e5 that just moved two squares");
+    expect(validateFen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1").ok).toBe(true);
+    // Move counters.
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - - x 1")).toMatch(/^The half-move clock \(5th field\) must be a whole number/);
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - - 1.5 1")).toMatch(/half-move clock/);
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - - 0 0")).toMatch(/^The move number \(6th field\) must be a whole number, 1 or more, not "0"/);
+    expect(err("4k3/8/8/8/8/8/8/4K3 w - - 0 -3")).toMatch(/move number/);
+    // Positions that can't arise.
+    expect(err("8/8/8/8/8/8/4k3/4K3 w - - 0 1")).toBe("The kings can't stand next to each other (e1 and e2)");
+    expect(err("4k3/4R3/8/8/8/8/8/4K3 w - - 0 1")).toMatch(/^Black is in check but it is White's turn/);
+    // Very long junk is shortened in messages.
+    expect(err(`4k3/8/8/8/8/8/8/4K3 ${"y".repeat(100)} - - 0 1`).length).toBeLessThan(100);
+  });
+
   it("finds en-passant candidates", () => {
     const fen = "rnbqkbnr/pp2pppp/8/2ppP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3";
     expect(enPassantCandidates(parseFenBoard(fen), "w")).toEqual(["d6"]);

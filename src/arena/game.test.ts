@@ -150,10 +150,15 @@ describe("time", () => {
   });
 
   it("a host timeout loses on time even without a clock", async () => {
+    // Nodes only: the host's safety limit stopped the search, and the detail says so.
     const g = await play(new FakeEngine(), new FakeEngine(() => ({ stopReason: "timeout", elapsedMs: 1200 })));
     expect(g.result).toBe("1-0");
     expect(g.termination).toBe("timeout");
-    expect(g.detail).toMatch(/did not stop within its limit/);
+    expect(g.detail).toMatch(/still running after 60 seconds, the longest a search limited only by depth or nodes may take/);
+    // A time per move that the engine overran.
+    const m = await play(new FakeEngine(), new FakeEngine(() => ({ stopReason: "timeout", elapsedMs: 1200 })), { black: side("Beta", { limits: { movetimeMs: 100 } }) });
+    expect(m.result).toBe("1-0");
+    expect(m.detail).toMatch(/did not stop within its limit and had to be cut short/);
   });
 
   it("is a draw when the opponent of the flagging side cannot mate", async () => {

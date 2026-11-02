@@ -16,7 +16,7 @@
 //   adjudication (./adjudication) → "resign" / "adjudication"; the ply limit → draw, "max-moves";
 //   the AbortSignal → result "*", "aborted".
 import { ChessGame, START_FEN } from "@/chess";
-import { toSearchLimits } from "@/engine-host/limits";
+import { DEFAULT_MAX_WAIT_MS, toSearchLimits } from "@/engine-host/limits";
 import type { GameResult, SearchInfo, SearchResult, Termination } from "@/types";
 import { Adjudicator, MATE_SCORE } from "./adjudication";
 import { chargeMove, hasMatingMaterial, initialClockMs } from "./clock";
@@ -220,10 +220,14 @@ export async function runEngineGame(opts: PlayEngineGameOptions, engines: { whit
     const charge = chargeMove(tc[side], clock[side], elapsed, movesOnClock[side]);
     if (res.stopReason === "timeout" || charge.flagged) {
       if (clock[side] !== null) clock[side] = 0;
+      // Without a clock or a time per move, the host stops a depth / nodes search at its safety
+      // limit: the engine kept to its limit, the limit was just too deep for the time allowed.
       const detail =
         clock[side] !== null
           ? `${label(side)} ran out of time`
-          : `${label(side)}'s search did not stop within its limit and had to be cut short`;
+          : limits.movetimeMs
+            ? `${label(side)}'s search did not stop within its limit and had to be cut short`
+            : `${label(side)}'s search was still running after ${Math.round(DEFAULT_MAX_WAIT_MS / 1000)} seconds, the longest a search limited only by depth or nodes may take`;
       end = hasMatingMaterial(game.fen(), other(side))
         ? loss(side, "timeout", detail)
         : { result: "1/2-1/2", termination: "timeout", detail: `${detail}, but ${COLOR_NAME[other(side)]} has no mating material` };
@@ -236,7 +240,7 @@ export async function runEngineGame(opts: PlayEngineGameOptions, engines: { whit
       break;
     }
     if (!UCI_MOVE.test(best) || !game.isLegal(best)) {
-      end = loss(side, "illegal-move", `${label(side)} played "${best.slice(0, 16)}", which is not a legal move in this position`);
+      end = loss(side, "illegal-move", `${label(side)} played “${best.slice(0, 16)}”, which is not a legal move in this position`);
       break;
     }
     game.play(best);

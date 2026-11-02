@@ -1,12 +1,13 @@
 // Main area of a blocks engine: the Blockly editor. Every change saves the workspace together
 // with the eval.ts generated from it (so building never needs Blockly).
-import { useEffect, useRef } from "react";
-import { BlocksEditor, DEFAULT_WORKSPACE, GENERATOR_VERSION, generateEvalSource } from "@/blocks";
+import { useEffect, useRef, type Ref } from "react";
+import { BlocksEditor, DEFAULT_WORKSPACE, GENERATOR_VERSION, generateEvalSource, type BlocksEditorHandle } from "@/blocks";
 import type { EngineRecord } from "@/types";
 import type { EngineDraft } from "./draft";
 import { blocksPatch } from "./records";
 
-export function BlocksMain({ view, draft }: { view: EngineRecord; draft: EngineDraft }) {
+/** `editorRef` lets the Workshop take the newest edit at once (flush) before it saves or builds. */
+export function BlocksMain({ view, draft, editorRef }: { view: EngineRecord; draft: EngineDraft; editorRef?: Ref<BlocksEditorHandle> }) {
   const regenerated = useRef(false);
 
   // Code stored by an older generator (or no code at all) is regenerated once when the engine
@@ -31,6 +32,7 @@ export function BlocksMain({ view, draft }: { view: EngineRecord; draft: EngineD
     <div className="workshop-blocks">
       <BlocksEditor
         key={view.id}
+        ref={editorRef}
         workspace={workspace}
         onChange={(ws, code) => draft.edit(blocksPatch(draft.view, ws, code, GENERATOR_VERSION))}
       />

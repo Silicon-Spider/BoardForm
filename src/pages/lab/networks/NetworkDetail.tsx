@@ -110,7 +110,8 @@ function NetworkView({ network: n }: { network: NetworkRecord }) {
             { label: "Training loss", value: formatLoss(n.stats.trainLoss) },
             { label: "Positions seen", value: n.stats.positionsSeen > 0 ? formatCount(n.stats.positionsSeen) : "—" },
             { label: "Epochs", value: n.stats.epochs > 0 ? String(n.stats.epochs) : "—" },
-            { label: "Created", value: <TimeAgo ts={n.createdAt} />, title: formatDateTime(n.createdAt) },
+            // A starter network was not created here: it was added when the app first started.
+            { label: n.builtin ? "Added" : "Created", value: <TimeAgo ts={n.createdAt} />, title: formatDateTime(n.createdAt) },
           ]}
         />
       </div>
@@ -210,6 +211,8 @@ function NetworkView({ network: n }: { network: NetworkRecord }) {
                     <Link to={`/lab/runs/${run.id}`}>{run.config.name}</Link>
                   ) : n.stats.trainingRunId ? (
                     <span className="faint">A deleted run</span>
+                  ) : n.builtin ? (
+                    <span className="faint">Trained before it shipped with BoardForm</span>
                   ) : (
                     <span className="faint">{n.stats.positionsSeen > 0 ? "—" : "Not trained here (imported or created)"}</span>
                   )}
@@ -219,7 +222,7 @@ function NetworkView({ network: n }: { network: NetworkRecord }) {
                 <dt>Datasets</dt>
                 <dd>
                   {trainedOn.length === 0 ? (
-                    <span className="faint">—</span>
+                    <span className="faint">{n.builtin ? "Not included in the app" : "—"}</span>
                   ) : (
                     <span className="lab-inline-list">
                       {trainedOn.map((d) =>

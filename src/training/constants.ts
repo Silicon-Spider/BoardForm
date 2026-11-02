@@ -46,8 +46,9 @@ export const RUN_FLUSH_MS = 3000;
 
 /** Dataset records are updated at most this often while positions are being added. */
 export const DATASET_UPDATE_MS = 2000;
-/** The chunk being filled is written to IndexedDB at least this often (limits loss on tab close). */
-export const DATASET_PARTIAL_FLUSH_MS = 30_000;
+/** The chunk being filled is written to IndexedDB at least this often (limits loss on tab close: a
+ * reload or a closed browser loses at most this much self-play; a rewrite is at most 512 KB). */
+export const DATASET_PARTIAL_FLUSH_MS = 10_000;
 
 /** A self-play job fails after this many games in a row ended in an engine error. */
 export const MAX_CONSECUTIVE_GAME_ERRORS = 3;

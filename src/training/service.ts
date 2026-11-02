@@ -287,7 +287,7 @@ export function createLabService(deps: ServiceDeps): LabService {
         if (fresh.autoResume) {
           await deps.runs.update(run.id, { log: appendLog(fresh.log ?? [], logEntry("info", "Interrupted when the tab was closed; resuming automatically.")) });
           await startRun(run.id, { lock });
-          deps.notify.toast(`Resumed the training run "${fresh.config.name}"`, { kind: "info" });
+          deps.notify.toast(`Resumed the training run “${fresh.config.name}”`, { kind: "info" });
         } else {
           try {
             await deps.runs.update(run.id, {
