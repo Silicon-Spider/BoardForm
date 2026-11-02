@@ -1,0 +1,98 @@
+.cb-clock {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 48px;
+  padding: 0 14px 0 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-dim);
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition);
+}
+.cb-clock-side {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  border: 1.5px solid var(--border-strong);
+}
+.cb-clock-side--w {
+  background: #f4f4f2;
+}
+.cb-clock-side--b {
+  background: #1c1f24;
+  border-color: #5a6270;
+}
+.cb-clock-label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+.cb-clock-time {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.cb-clock--running {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+.cb-clock--running .cb-clock-time {
+  color: var(--accent);
+}
+.cb-clock-tick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: cb-clock-pulse 1s ease-in-out infinite;
+}
+@keyframes cb-clock-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+.cb-clock--low .cb-clock-time,
+.cb-clock--low.cb-clock--running .cb-clock-time {
+  color: var(--danger);
+}
+.cb-clock--low.cb-clock--running {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  box-shadow: 0 0 0 1px var(--danger) inset;
+}
+.cb-clock--low.cb-clock--running .cb-clock-tick {
+  background: var(--danger);
+}
+.cb-clock--flagged {
+  border-color: var(--danger);
+  background: var(--danger);
+}
+.cb-clock--flagged .cb-clock-time,
+.cb-clock--flagged .cb-clock-label {
+  color: #fff;
+}
+.cb-clock--compact {
+  height: 36px;
+  padding: 0 10px;
+  gap: 8px;
+}
+.cb-clock--compact .cb-clock-time {
+  font-size: 18px;
+}

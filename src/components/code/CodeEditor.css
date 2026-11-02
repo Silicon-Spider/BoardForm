@@ -1,0 +1,166 @@
+/* Code editor (CodeMirror 6). Colours are CSS variables so both app themes switch live.
+   They are defined on :root because CodeMirror tooltips can be rendered outside the editor. */
+:root {
+  --cb-code-bg: var(--bg-sunken);
+  --cb-code-active-line: rgba(255, 255, 255, 0.035);
+  --cb-code-selection: rgba(91, 156, 245, 0.34);
+  --cb-code-selection-blur: rgba(91, 156, 245, 0.2);
+  --cb-code-selection-match: rgba(91, 156, 245, 0.16);
+  --cb-code-bracket: rgba(91, 156, 245, 0.22);
+  --cb-code-bracket-border: rgba(91, 156, 245, 0.6);
+  --cb-code-search: rgba(231, 177, 74, 0.26);
+  --cb-code-search-border: rgba(231, 177, 74, 0.65);
+  --cb-code-search-selected: rgba(231, 177, 74, 0.55);
+  --cb-code-flash: rgba(91, 156, 245, 0.3);
+  --cb-code-icon-function: rgba(130, 170, 255, 0.16);
+  --cb-code-icon-constant: rgba(247, 140, 108, 0.16);
+  --cb-code-icon-type: rgba(255, 203, 107, 0.16);
+  --cb-code-icon-keyword: rgba(199, 146, 234, 0.16);
+
+  --cb-syn-keyword: #c792ea;
+  --cb-syn-type: #ffcb6b;
+  --cb-syn-function: #82aaff;
+  --cb-syn-property: #b9cbe0;
+  --cb-syn-variable: var(--text);
+  --cb-syn-number: #f78c6c;
+  --cb-syn-string: #c3e88d;
+  --cb-syn-comment: #737e91;
+  --cb-syn-meta: #ff9cac;
+  --cb-syn-builtin: #ff9cac;
+  --cb-syn-operator: #89ddff;
+  --cb-syn-punctuation: #8f9bb3;
+}
+
+:root[data-theme="light"] {
+  --cb-code-bg: var(--surface);
+  --cb-code-active-line: rgba(47, 111, 220, 0.05);
+  --cb-code-selection: rgba(47, 111, 220, 0.24);
+  --cb-code-selection-blur: rgba(47, 111, 220, 0.14);
+  --cb-code-selection-match: rgba(47, 111, 220, 0.1);
+  --cb-code-bracket: rgba(47, 111, 220, 0.13);
+  --cb-code-bracket-border: rgba(47, 111, 220, 0.55);
+  --cb-code-search: rgba(234, 179, 8, 0.28);
+  --cb-code-search-border: rgba(202, 138, 4, 0.7);
+  --cb-code-search-selected: rgba(234, 179, 8, 0.6);
+  --cb-code-flash: rgba(47, 111, 220, 0.2);
+  --cb-code-icon-function: rgba(30, 102, 245, 0.1);
+  --cb-code-icon-constant: rgba(194, 65, 12, 0.1);
+  --cb-code-icon-type: rgba(180, 83, 9, 0.1);
+  --cb-code-icon-keyword: rgba(136, 57, 239, 0.1);
+
+  --cb-syn-keyword: #8839ef;
+  --cb-syn-type: #b45309;
+  --cb-syn-function: #1e66f5;
+  --cb-syn-property: #1d4f73;
+  --cb-syn-variable: var(--text);
+  --cb-syn-number: #c2410c;
+  --cb-syn-string: #2b7a2f;
+  --cb-syn-comment: #6b7480;
+  --cb-syn-meta: #c2185b;
+  --cb-syn-builtin: #c2185b;
+  --cb-syn-operator: #0369a1;
+  --cb-syn-punctuation: #57606a;
+}
+
+.cb-code-editor {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--cb-code-bg);
+}
+.cb-code-editor > .cm-editor {
+  flex: 1;
+  min-height: 0;
+}
+
+/* AssemblyScript types used like values (`i32(x)`) and builtin calls (`unchecked(...)`).
+   The `*` part wins over the syntax-highlighting span nested inside the mark. */
+.cm-line .cb-tok-astype,
+.cm-line .cb-tok-astype * {
+  color: var(--cb-syn-type);
+}
+.cm-line .cb-tok-asbuiltin,
+.cm-line .cb-tok-asbuiltin * {
+  color: var(--cb-syn-builtin);
+}
+
+/* Small screens: a slimmer gutter leaves more room for code. */
+@media (max-width: 600px) {
+  .cb-code-editor .cm-gutters .cm-lineNumbers .cm-gutterElement {
+    min-width: 24px;
+    padding: 0 4px 0 4px;
+  }
+  .cb-code-editor .cm-line {
+    padding-left: 4px;
+  }
+}
+
+/* Revealed line (revealLine prop). */
+.cm-line.cb-code-flash {
+  animation: cb-code-flash 1.6s ease-out;
+}
+@keyframes cb-code-flash {
+  0%,
+  35% {
+    background-color: var(--cb-code-flash);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-line.cb-code-flash {
+    animation: none;
+    background-color: var(--cb-code-flash);
+  }
+}
+
+/* Read-only: no blinking caret, a quieter active line. */
+.cb-code-editor--readonly .cm-activeLine,
+.cb-code-editor--readonly .cm-activeLineGutter {
+  background-color: transparent;
+}
+
+/* Completion info panel (signature + doc of the selected completion). */
+.cb-code-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: min(320px, 50vh);
+  overflow: auto;
+}
+.cb-code-info p {
+  margin: 0;
+  color: var(--text-dim);
+}
+.cb-code-info p code {
+  font-size: 0.92em;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--text);
+}
+.cb-code-info-sig {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cb-code-info-empty {
+  font-style: italic;
+  color: var(--text-faint) !important;
+}
+.cb-code-info-footer {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}

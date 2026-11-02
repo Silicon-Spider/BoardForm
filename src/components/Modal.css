@@ -1,0 +1,38 @@
+.cb-modal {
+  animation: cb-modal-in 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.cb-modal:focus {
+  outline: none;
+}
+.cb-modal-title {
+  flex: 1;
+  min-width: 0;
+}
+.cb-modal-close {
+  margin: -6px -8px -6px 8px;
+  color: var(--text-dim);
+}
+@keyframes cb-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+/* Solid destructive button for confirmations (global .btn-danger is the soft variant). */
+.cb-btn-danger-solid {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.cb-btn-danger-solid:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, #000);
+  border-color: color-mix(in srgb, var(--danger) 85%, #000);
+}
+.cb-confirm-message {
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+.cb-confirm-message > :last-child {
+  margin-bottom: 0;
+}

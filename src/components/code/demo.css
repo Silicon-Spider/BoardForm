@@ -1,0 +1,75 @@
+/* Gallery demo of the code components (#/dev/code). */
+.cb-code-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.cb-code-demo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.cb-code-demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+.cb-code-demo-grid {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  gap: 12px;
+  height: 620px;
+  min-width: 0;
+}
+.cb-code-demo-tree,
+.cb-code-demo-api,
+.cb-code-demo-editor {
+  min-height: 0;
+  overflow: hidden;
+}
+.cb-code-demo-tree > .cb-tree {
+  height: 100%;
+}
+.cb-code-demo-editor-head {
+  min-height: 38px;
+  padding: 6px 12px;
+  font-weight: 550;
+}
+.cb-code-demo-keys {
+  white-space: nowrap;
+}
+.cb-code-demo-editor-body {
+  flex: 1;
+  min-height: 0;
+  border-bottom-left-radius: var(--radius);
+  border-bottom-right-radius: var(--radius);
+  overflow: hidden;
+}
+.cb-code-demo-none {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-dim);
+}
+@media (max-width: 1180px) {
+  .cb-code-demo-grid {
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-rows: 520px 420px;
+    height: auto;
+  }
+  .cb-code-demo-api {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 720px) {
+  .cb-code-demo-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 220px 460px 420px;
+  }
+  .cb-code-demo-keys {
+    display: none;
+  }
+}

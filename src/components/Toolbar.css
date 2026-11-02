@@ -1,0 +1,39 @@
+.cb-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.cb-toolbar--framed {
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.cb-toolbar--compact {
+  gap: 4px;
+}
+.cb-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cb-toolbar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 4px 0 2px;
+}
+.cb-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 20px;
+  margin: 2px 4px;
+  background: var(--border);
+}
+.cb-toolbar-spacer {
+  flex: 1;
+}

@@ -1,0 +1,22 @@
+.cb-tabs .tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cb-tabs .tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.cb-tab-badge {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+}
+.cb-tabs .tab.active .cb-tab-badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.cb-tabs--sm .tab {
+  padding: 6px 10px;
+  font-size: 13px;
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.scratch/
+test-results/
+playwright-report/
+*.log

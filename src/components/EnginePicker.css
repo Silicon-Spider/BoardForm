@@ -1,0 +1,123 @@
+.cb-ep-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 160px;
+  text-align: left;
+  cursor: pointer;
+}
+.cb-ep-button:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+.cb-ep-button--open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.cb-ep-current {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cb-ep-placeholder {
+  color: var(--text-faint);
+}
+.cb-ep-chevron {
+  flex: none;
+  color: var(--text-faint);
+  transition: transform var(--transition);
+}
+.cb-ep-button--open .cb-ep-chevron {
+  transform: rotate(180deg);
+}
+.cb-ep-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--cb-ep-dot, var(--text-faint));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cb-ep-dot, var(--text-faint)) 25%, transparent);
+}
+.cb-ep-dot--empty {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--border-strong);
+}
+.cb-ep-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 550;
+}
+.cb-ep-pop {
+  position: fixed;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: cb-ep-in 110ms ease;
+}
+@keyframes cb-ep-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+.cb-ep-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-faint);
+}
+.cb-ep-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.cb-ep-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  min-height: 0;
+  outline: none;
+}
+.cb-ep-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text);
+}
+.cb-ep-option.active {
+  background: var(--surface-3);
+}
+.cb-ep-option.selected {
+  background: var(--accent-soft);
+}
+.cb-ep-option.selected.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.cb-ep-check {
+  color: var(--accent);
+  flex: none;
+}
+.cb-ep-empty {
+  padding: 14px 10px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}

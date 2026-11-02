@@ -1,0 +1,28 @@
+.cb-tooltip-anchor {
+  display: inline-flex;
+  max-width: 100%;
+}
+.cb-tooltip {
+  position: fixed;
+  z-index: 300;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: 0;
+}
+.cb-tooltip--shown {
+  opacity: 1;
+  animation: cb-tip-in 110ms ease;
+}
+@keyframes cb-tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}

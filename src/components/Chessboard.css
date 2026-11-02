@@ -1,0 +1,187 @@
+/* Chessboard + shared board layers (also used by BoardEditor). Colours come from the
+   --board-* tokens in global.css so themes can restyle the board. */
+
+.cb-board {
+  --cb-arrow: #2b63c6;
+  --cb-anim: 150ms;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  container-type: inline-size;
+  border-radius: 4px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.28),
+    0 10px 28px rgba(0, 0, 0, 0.22);
+  background: var(--board-dark);
+}
+.cb-board--interactive {
+  touch-action: none;
+  cursor: pointer;
+}
+.cb-board--dragging,
+.cb-board--dragging * {
+  cursor: grabbing !important;
+}
+
+.cb-squares {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.cb-sq-light {
+  fill: var(--board-light);
+}
+.cb-sq-dark {
+  fill: var(--board-dark);
+}
+
+.cb-highlights,
+.cb-pieces,
+.cb-coords {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- square highlights ---- */
+.cb-hl {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+}
+.cb-hl--last {
+  background: var(--board-last-move);
+}
+.cb-hl--selected {
+  background: var(--board-selected);
+}
+.cb-hl--check {
+  background: var(--board-check);
+}
+.cb-hl--dest {
+  background: radial-gradient(circle, var(--board-dot) 0, var(--board-dot) 19%, transparent 20.5%);
+}
+.cb-hl--capture {
+  background: radial-gradient(transparent 0, transparent 78%, var(--board-dot) 79.5%);
+}
+.cb-hl--hover {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+
+/* ---- coordinates ---- */
+.cb-coord {
+  position: absolute;
+  font-family: var(--font-sans);
+  font-size: clamp(8px, 2.15cqw, 12.5px);
+  font-weight: 700;
+  line-height: 1;
+}
+.cb-coord.on-light {
+  color: var(--board-coord-light);
+}
+.cb-coord.on-dark {
+  color: var(--board-coord-dark);
+}
+.cb-coord-rank {
+  left: 0;
+  padding: 0.28em 0 0 0.32em;
+}
+.cb-coord-file {
+  bottom: 0;
+  width: 12.5%;
+  text-align: right;
+  padding: 0 0.34em 0.26em 0;
+}
+
+/* ---- pieces ---- */
+.cb-piece {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 12.5%;
+  height: 12.5%;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  will-change: transform;
+  transition: transform var(--cb-anim) cubic-bezier(0.3, 0.1, 0.25, 1);
+}
+.cb-piece--faded {
+  opacity: 0.3;
+}
+.cb-piece--hidden {
+  visibility: hidden;
+}
+
+/* ---- arrows ---- */
+.cb-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---- drag ghost (portal on body) ---- */
+.cb-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  will-change: transform;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35));
+}
+
+/* ---- promotion picker ---- */
+.cb-promo {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(8, 10, 14, 0.55);
+  animation: cb-fade-in 120ms ease;
+  cursor: default;
+}
+.cb-promo-piece {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background: radial-gradient(circle at 50% 42%, #ffffff 0%, #e3e6ea 55%, #b9c0ca 100%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+  transition:
+    border-radius 120ms ease,
+    background 120ms ease;
+}
+.cb-promo-piece > span {
+  position: absolute;
+  inset: 7%;
+  background-size: 100% 100%;
+  transition: transform 120ms ease;
+}
+.cb-promo-piece:hover,
+.cb-promo-piece:focus-visible {
+  border-radius: 10%;
+  background: radial-gradient(circle at 50% 42%, #ffd28a 0%, #f0a33a 70%, #d9822b 100%);
+  outline: none;
+}
+.cb-promo-piece:hover > span {
+  transform: scale(1.06);
+}
+
+@keyframes cb-fade-in {
+  from {
+    opacity: 0;
+  }
+}

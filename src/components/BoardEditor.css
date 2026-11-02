@@ -1,0 +1,174 @@
+.cb-editor-wrap {
+  container-type: inline-size;
+  min-width: 0;
+}
+.cb-editor {
+  display: grid;
+  grid-template-columns: minmax(240px, 460px) minmax(230px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@container (max-width: 640px) {
+  .cb-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.cb-editor-boardcol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Palette: 8 columns that line up with the board files: tool, 6 pieces, eraser. */
+.cb-editor-palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.cb-editor-spare,
+.cb-editor-tool {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition),
+    box-shadow var(--transition);
+}
+.cb-editor-tool {
+  cursor: pointer;
+}
+.cb-editor-spare > span {
+  position: absolute;
+  inset: 6%;
+  background-size: 100% 100%;
+  pointer-events: none;
+  transition: transform var(--transition);
+}
+.cb-editor-spare:hover,
+.cb-editor-tool:hover {
+  background: var(--surface-3);
+}
+.cb-editor-spare:hover > span {
+  transform: scale(1.06);
+}
+.cb-editor-spare.active,
+.cb-editor-tool.active {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+  color: var(--accent);
+}
+.cb-editor-board--erase {
+  cursor: crosshair;
+}
+.cb-editor-board--paint {
+  cursor: copy;
+}
+
+.cb-editor-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.cb-editor-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.cb-editor-group > .section-title {
+  margin: 0;
+}
+.cb-editor-turn .btn {
+  min-width: 92px;
+}
+.cb-editor-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+}
+.cb-editor-swatch--w {
+  background: #f4f4f2;
+}
+.cb-editor-swatch--b {
+  background: #1c1f24;
+  border-color: #5a6270;
+}
+.cb-editor-castling {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cb-editor-castle-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.cb-editor-castle-side {
+  width: 44px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.cb-editor-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.cb-editor-group .select {
+  max-width: 200px;
+}
+.cb-editor-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cb-editor-fen {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.cb-editor-fen .input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.cb-editor-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.cb-editor-status .cb-icon {
+  flex: none;
+  margin-top: 1px;
+}
+.cb-editor-status.ok {
+  color: var(--ok);
+}
+.cb-editor-status.error {
+  color: var(--danger);
+}
+.cb-editor-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}

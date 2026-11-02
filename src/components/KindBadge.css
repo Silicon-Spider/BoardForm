@@ -1,0 +1,13 @@
+.cb-kind {
+  --cb-kind: var(--text-faint);
+  background: color-mix(in srgb, var(--cb-kind) 15%, transparent);
+  /* Mixed towards the text colour so the label keeps contrast in both themes. */
+  color: color-mix(in srgb, var(--cb-kind) 72%, var(--text));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cb-kind) 28%, transparent);
+  flex: none;
+}
+.cb-kind--sm {
+  height: 17px;
+  padding: 0 6px;
+  font-size: 10px;
+}

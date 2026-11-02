@@ -1,0 +1,779 @@
+/* Engine Library page and the new-engine wizard. Classes are prefixed "engines-". The wizard and
+   the card menu render in portals (outside .engines-page), so their rules are not nested. */
+
+/* ---------- Page & header ---------- */
+.engines-header {
+  align-items: flex-end;
+}
+.engines-header-text {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.engines-header-text .page-subtitle {
+  margin: 4px 0 0;
+  max-width: 720px;
+}
+.engines-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Toolbar ---------- */
+.engines-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.engines-search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.engines-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.engines-search-input {
+  width: 100%;
+  padding-left: 32px;
+  padding-right: 34px;
+}
+.engines-search-input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+.engines-search-kbd {
+  position: absolute;
+  right: 9px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.engines-search-input:focus ~ .engines-search-kbd,
+.engines-search-input:not(:placeholder-shown) ~ .engines-search-kbd {
+  display: none;
+}
+.engines-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.engines-select-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.engines-select .select {
+  min-width: 0;
+}
+.engines-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ---------- Grid & cards ---------- */
+.engines-grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  margin-top: 16px;
+}
+.engines-card {
+  --engine-color: var(--text-faint);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 16px 14px;
+  min-width: 0;
+  overflow: hidden;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    transform var(--transition);
+}
+.engines-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--engine-color);
+}
+.engines-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+.engines-card:has(.engines-card-link:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.engines-card--new {
+  animation: engines-flash 2.4s ease-out;
+}
+@keyframes engines-flash {
+  0%,
+  35% {
+    box-shadow:
+      0 0 0 2px var(--engine-color),
+      var(--shadow);
+  }
+  100% {
+    box-shadow: var(--shadow-sm);
+  }
+}
+.engines-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+.engines-card-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--engine-color) 18%, var(--surface-2));
+  color: color-mix(in srgb, var(--engine-color) 70%, var(--text));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--engine-color) 35%, transparent);
+}
+.engines-card-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.engines-card-name {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.engines-card-link {
+  color: var(--text);
+}
+.engines-card-link:hover {
+  text-decoration: none;
+}
+.engines-card-link:focus-visible {
+  outline: none;
+}
+/* The name link covers the whole card, so a click anywhere opens the Workshop. */
+.engines-card-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.engines-card:hover .engines-card-name {
+  color: color-mix(in srgb, var(--engine-color) 35%, var(--text));
+}
+.engines-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.engines-badge-sm {
+  height: 17px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+.engines-card-menu {
+  position: relative;
+  z-index: 1;
+  margin: -4px -6px 0 0;
+  color: var(--text-dim);
+}
+.engines-card-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 3em;
+  color: var(--text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.engines-card-desc.faint {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.engines-card-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.engines-card-meta li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+.engines-meta-ok .cb-icon {
+  color: var(--ok);
+}
+.engines-meta-network .cb-icon {
+  color: var(--kind-nnue);
+  flex: none;
+}
+.engines-meta-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.engines-card-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+.engines-card-actions .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 8px;
+}
+.engines-card-actions .btn:hover {
+  text-decoration: none;
+}
+
+/* Skeleton cards */
+.engines-card--skeleton {
+  pointer-events: none;
+}
+.engines-card--skeleton::before {
+  background: var(--surface-3);
+}
+.engines-skel {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-3) 0%, var(--surface-2) 50%, var(--surface-3) 100%);
+  background-size: 200% 100%;
+  animation: engines-shimmer 1.4s ease-in-out infinite;
+}
+.engines-skel-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex: none;
+}
+.engines-skel-btn {
+  height: 28px;
+  flex: 1;
+}
+@keyframes engines-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* ---------- Empty & no-results states ---------- */
+.engines-noresults {
+  margin-top: 16px;
+}
+.engines-empty {
+  padding: 40px 24px 32px;
+}
+.engines-empty-ways {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 940px;
+  margin: 8px 0 16px;
+  text-align: left;
+}
+.engines-empty-way {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+.engines-empty-way:hover {
+  border-color: color-mix(in srgb, var(--approach-color) 60%, var(--border));
+  background: color-mix(in srgb, var(--approach-color) 6%, var(--surface));
+}
+.engines-empty-note {
+  margin: 4px 0 0;
+  max-width: 560px;
+}
+.engines-empty .cb-empty-action {
+  order: 1;
+  margin-top: 0;
+}
+.engines-empty .engines-empty-note {
+  order: 2;
+  margin-top: 12px;
+}
+
+/* ---------- Card menu (portal) ---------- */
+.engines-menu {
+  position: fixed;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  animation: fade-in 100ms ease;
+}
+.engines-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.engines-menu-item:hover,
+.engines-menu-item:focus-visible {
+  background: var(--surface-3);
+  outline: none;
+}
+.engines-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.engines-menu-icon {
+  display: inline-flex;
+  width: 16px;
+  color: var(--text-dim);
+}
+.engines-menu-item--danger,
+.engines-menu-item--danger .engines-menu-icon {
+  color: var(--danger);
+}
+.engines-menu-item--danger:hover,
+.engines-menu-item--danger:focus-visible {
+  background: var(--danger-soft);
+}
+
+/* ---------- Wizard (portal) ---------- */
+.engines-wizard .modal-body {
+  padding-top: 18px;
+}
+.engines-wizard-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.engines-wizard-stepcount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+.engines-wizard-heading {
+  margin: 0;
+  font-size: 15px;
+}
+.engines-wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.engines-wizard-hint {
+  align-self: center;
+  max-width: 240px;
+  text-align: right;
+  line-height: 1.35;
+}
+.engines-approaches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.engines-approach {
+  --approach-color: var(--accent);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+.engines-approach:hover {
+  border-color: color-mix(in srgb, var(--approach-color) 60%, var(--border));
+  background: color-mix(in srgb, var(--approach-color) 7%, var(--surface-2));
+}
+.engines-approach.is-selected {
+  border-color: var(--approach-color);
+}
+.engines-approach-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--approach-color) 16%, transparent);
+  color: color-mix(in srgb, var(--approach-color) 78%, var(--text));
+}
+.engines-approach-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.engines-approach-title {
+  font-weight: 650;
+}
+.engines-approach-desc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.engines-approach-chevron {
+  flex: none;
+  align-self: center;
+  color: var(--text-faint);
+}
+.engines-approach:hover .engines-approach-chevron {
+  color: var(--approach-color);
+}
+.engines-wizard-chosen {
+  --approach-color: var(--accent);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--approach-color) 35%, var(--border));
+  background: color-mix(in srgb, var(--approach-color) 7%, var(--surface-2));
+}
+.engines-field-optional {
+  font-weight: 500;
+}
+
+/* Radio cards (scratch starting point, networks) */
+.engines-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.engines-options--scroll {
+  max-height: 248px;
+  overflow: auto;
+  padding: 2px;
+  margin: -2px;
+}
+.engines-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+.engines-option:hover {
+  border-color: var(--border-strong);
+}
+.engines-option.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.engines-option input {
+  flex: none;
+  margin: 3px 0 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+}
+.engines-option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.engines-option-title {
+  font-weight: 600;
+}
+.engines-option-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* Colour swatches */
+.engines-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.engines-swatch {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+.engines-swatch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.engines-swatch-chip {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  transition: transform var(--transition);
+}
+.engines-swatch-chip .cb-icon {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+}
+.engines-swatch:hover .engines-swatch-chip {
+  transform: scale(1.08);
+}
+.engines-swatch input:checked + .engines-swatch-chip,
+.engines-swatch.is-checked .engines-swatch-chip {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.engines-swatch input:focus-visible + .engines-swatch-chip {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.engines-swatch--custom .engines-swatch-chip {
+  background: conic-gradient(#ef6363, #f59e0b, #eab308, #4cc38a, #22d3ee, #5b9cf5, #a78bfa, #f472b6, #ef6363);
+}
+
+/* .wasm upload */
+.engines-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 22px 16px;
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  text-align: center;
+  transition:
+    border-color var(--transition),
+    background var(--transition);
+}
+.engines-dropzone.is-dragging,
+.engines-wasm.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.engines-dropzone-icon {
+  color: var(--text-dim);
+}
+.engines-wasm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.engines-wasm-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.engines-wasm-file > .cb-icon {
+  flex: none;
+  color: var(--text-dim);
+}
+.engines-wasm-file-name {
+  min-width: 0;
+  font-weight: 600;
+}
+.engines-wasm-verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.engines-wasm-verdict .cb-icon {
+  flex: none;
+  margin-top: 3px;
+}
+.engines-wasm-list {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.engines-wasm-list li + li {
+  margin-top: 3px;
+}
+.engines-caps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.engines-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+}
+.engines-cap.is-yes {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.engines-cap.is-no {
+  background: var(--surface-3);
+  color: var(--text-faint);
+}
+.engines-wasm-notes summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.engines-wasm-notes[open] summary {
+  margin-bottom: 4px;
+}
+.engines-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 640px) {
+  .engines-page {
+    padding: 16px;
+  }
+  .engines-header-actions {
+    width: 100%;
+  }
+  .engines-header-actions .btn {
+    flex: 1;
+  }
+  .engines-search {
+    flex-basis: 100%;
+  }
+  .engines-select {
+    flex: 1 1 140px;
+  }
+  /* The selects say what they are ("All kinds", "Recently updated"); keep the labels for screen readers only. */
+  .engines-select-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .engines-select .select {
+    flex: 1;
+  }
+  .engines-count {
+    margin-left: 0;
+  }
+  .engines-approaches {
+    grid-template-columns: 1fr;
+  }
+  .engines-wizard-hint {
+    display: none;
+  }
+  .engines-empty {
+    padding: 28px 14px 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engines-skel,
+  .engines-card--new {
+    animation: none;
+  }
+  .engines-card,
+  .engines-swatch-chip {
+    transition: none;
+  }
+}
