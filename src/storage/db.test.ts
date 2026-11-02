@@ -126,7 +126,7 @@ describe("connection lifecycle", () => {
     (await openRaw(5)).close();
     const err = await errorOf(enginesRepo.list());
     expect(err.code).toBe("version-mismatch");
-    expect(err.message).toMatch(/newer version of Chess Builder/);
+    expect(err.message).toMatch(/newer version of BoardForm/);
   });
 });
 
@@ -159,7 +159,7 @@ describe("error mapping", () => {
     expect(isQuotaError(new Error("other"))).toBe(false);
     const err = await toStorageError(new DOMException("full", "QuotaExceededError"), "save the dataset chunk");
     expect(err.code).toBe("quota-exceeded");
-    expect(err.message).toMatch(/^Browser storage is full, so Chess Builder could not save the dataset chunk\./);
+    expect(err.message).toMatch(/^Browser storage is full, so BoardForm could not save the dataset chunk\./);
     expect(err.message).toMatch(/deleting datasets/);
   });
 

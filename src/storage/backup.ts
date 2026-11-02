@@ -1,11 +1,11 @@
 // Whole-database backups and single-engine files. Worker-safe.
 //
 // Backup file (JSON):
-//   { "format": "chess-builder-backup", "version": 1, "exportedAt": "<ISO date>", "app": "chess-builder",
+//   { "format": "boardform-backup", "version": 1, "exportedAt": "<ISO date>", "app": "boardform",
 //     "dbVersion": 1, "options": { includeDatasets, includeGames },
 //     "stores": { "<store>": [record, ...], ... }, "counts": { "<store>": n, ... } }
 // Engine file (JSON):
-//   { "format": "chess-builder-engine", "version": 1, "exportedAt": "<ISO date>",
+//   { "format": "boardform-engine", "version": 1, "exportedAt": "<ISO date>",
 //     "engine": EngineRecord (build removed), "network": { "record": NetworkRecord, "data": NetworkDataRecord } | null }
 // Binary values (wasm modules, network weights, dataset chunks) are tagged base64 — see ./codec.ts.
 
@@ -17,10 +17,15 @@ import { newId } from "./id";
 import { chunkId, enginesRepo, networksRepo, putMany, readStoreInBatches } from "./repos";
 import { STORE_NAMES, type StoreName } from "./stores";
 
-export const BACKUP_FORMAT = "chess-builder-backup";
+export const BACKUP_FORMAT = "boardform-backup";
 export const BACKUP_VERSION = 1;
-export const ENGINE_FILE_FORMAT = "chess-builder-engine";
+export const ENGINE_FILE_FORMAT = "boardform-engine";
 export const ENGINE_FILE_VERSION = 1;
+/** Format names written before the app was renamed to BoardForm; still accepted on import. */
+const LEGACY_BACKUP_FORMAT = "chess-builder-backup";
+const LEGACY_ENGINE_FILE_FORMAT = "chess-builder-engine";
+const isBackupFormat = (f: unknown): boolean => f === BACKUP_FORMAT || f === LEGACY_BACKUP_FORMAT;
+const isEngineFileFormat = (f: unknown): boolean => f === ENGINE_FILE_FORMAT || f === LEGACY_ENGINE_FILE_FORMAT;
 
 export interface BackupOptions {
   /** Include datasets and their position chunks (often by far the largest data). Default false. */
@@ -55,7 +60,7 @@ async function readJsonFile(file: Blob, what: string): Promise<unknown> {
   try {
     return JSON.parse(text);
   } catch (err) {
-    throw invalid(`This file is not a valid Chess Builder ${what} (it is not readable JSON — was it truncated?).`, err);
+    throw invalid(`This file is not a valid BoardForm ${what} (it is not readable JSON — was it truncated?).`, err);
   }
 }
 
@@ -86,7 +91,7 @@ export async function exportBackup(opts: BackupOptions = {}): Promise<Blob> {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    app: "chess-builder",
+    app: "boardform",
     dbVersion: DB_VERSION,
     options: { includeDatasets, includeGames },
   });
@@ -136,16 +141,16 @@ function validateBackupRecord(store: StoreName, value: unknown, index: number): 
  */
 export async function importBackup(file: Blob): Promise<StoreCounts> {
   const raw = await readJsonFile(file, "backup");
-  if (!isObject(raw) || raw.format !== BACKUP_FORMAT) {
-    if (isObject(raw) && raw.format === ENGINE_FILE_FORMAT) {
+  if (!isObject(raw) || !isBackupFormat(raw.format)) {
+    if (isObject(raw) && isEngineFileFormat(raw.format)) {
       throw invalid("This is a single-engine file, not a backup — import it from the Engines page instead.");
     }
-    throw invalid("This file is not a Chess Builder backup.");
+    throw invalid("This file is not a BoardForm backup.");
   }
   if (typeof raw.version !== "number" || raw.version < 1) throw invalid("This backup is damaged: it has no format version.");
   if (raw.version > BACKUP_VERSION) {
     throw invalid(
-      `This backup was made by a newer version of Chess Builder (backup format ${raw.version}). Reload the page to update the app, then try again.`,
+      `This backup was made by a newer version of BoardForm (backup format ${raw.version}). Reload the page to update the app, then try again.`,
     );
   }
   const storesJson = raw.stores;
@@ -217,7 +222,7 @@ function parseEngine(value: unknown): EngineRecord {
   if (!isObject(value)) throw invalid("This engine file is damaged: it contains no engine.");
   const kind = value.kind;
   if (typeof kind !== "string" || !ENGINE_KINDS.includes(kind as EngineKind)) {
-    throw invalid(`This engine file has an unknown engine type "${String(kind)}" — was it made by a newer version of Chess Builder?`);
+    throw invalid(`This engine file has an unknown engine type "${String(kind)}" — was it made by a newer version of BoardForm?`);
   }
   if (value.files !== undefined && value.files !== null && !isStringRecord(value.files)) {
     throw invalid("This engine file is damaged: its source files are not text.");
@@ -284,14 +289,14 @@ export function uniqueImportName(name: string, taken: readonly string[]): string
  */
 export async function importEngineFile(file: Blob): Promise<string> {
   const raw = await readJsonFile(file, "engine file");
-  if (!isObject(raw) || raw.format !== ENGINE_FILE_FORMAT) {
-    if (isObject(raw) && raw.format === BACKUP_FORMAT) {
+  if (!isObject(raw) || !isEngineFileFormat(raw.format)) {
+    if (isObject(raw) && isBackupFormat(raw.format)) {
       throw invalid("This is a full backup, not a single engine — restore it from Settings instead.");
     }
-    throw invalid("This file is not a Chess Builder engine file.");
+    throw invalid("This file is not a BoardForm engine file.");
   }
   if (typeof raw.version !== "number" || raw.version > ENGINE_FILE_VERSION) {
-    throw invalid("This engine file was made by a newer version of Chess Builder. Reload the page to update the app, then try again.");
+    throw invalid("This engine file was made by a newer version of BoardForm. Reload the page to update the app, then try again.");
   }
   const engine = parseEngine(decodeValue(raw.engine));
   const network = raw.network === null || raw.network === undefined ? null : parseNetwork(decodeValue(raw.network));

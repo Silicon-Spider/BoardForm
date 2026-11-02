@@ -2,7 +2,7 @@
 // matches in this tab, so they keep going while the user navigates.
 //
 // Cross-tab rules:
-// * A Web Lock "chess-builder:match:<id>" is held while a tab runs a match, so two tabs never run
+// * A Web Lock "boardform:match:<id>" is held while a tab runs a match, so two tabs never run
 //   the same match. start() in another tab reports "running in another tab".
 // * A match whose tab was closed or reloaded stays "running" in the database. initArenaService()
 //   marks such matches "paused" (interrupted) once storage is ready — but only when no other tab
@@ -24,8 +24,8 @@ import { countGames } from "./schedule";
 import { computeStandings, formatPoints, scoreLine } from "./standings";
 import type { ArenaMatchExtras, ArenaMatchRecord, ArenaService, PlayEngineGameOptions, PlayedGame } from "./types";
 
-const LOCK_PREFIX = "chess-builder:match:";
-const CHANNEL_NAME = "chess-builder-arena";
+const LOCK_PREFIX = "boardform:match:";
+const CHANNEL_NAME = "boardform-arena";
 /** A just-released lock can be briefly held by another tab's watcher; start() retries this often. */
 const LOCK_RETRIES = 4;
 const LOCK_RETRY_MS = 120;

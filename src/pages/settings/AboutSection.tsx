@@ -46,7 +46,7 @@ export function AboutSection() {
     <SettingsSection id="about" title="About & credits" icon={<PageIcon name="heart" size={18} />}>
       <div className="settings-about">
         <p className="settings-about-lead">
-          <strong>Chess Builder</strong> lets you create your own chess engines — from drag-and-drop blocks, an evaluation function, a
+          <strong>BoardForm</strong> lets you create your own chess engines — from drag-and-drop blocks, an evaluation function, a
           complete engine or an empty file — compile them to WebAssembly in your browser, train NNUE networks with self-play, and play
           against them or pit them against each other. Everything runs on your device and is saved in this browser.
         </p>

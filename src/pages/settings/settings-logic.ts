@@ -4,12 +4,12 @@ import type { StoreName } from "@/storage/stores";
 import type { EngineRecord } from "@/types";
 import { plural } from "@/utils/format";
 
-/** "chess-builder-backup-2026-11-02.json" (local date). */
+/** "boardform-backup-2026-11-02.json" (local date). */
 export function backupFileName(date: Date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
-  return `chess-builder-backup-${y}-${m}-${d}.json`;
+  return `boardform-backup-${y}-${m}-${d}.json`;
 }
 
 export type AnimationPreset = "off" | "fast" | "normal" | "slow";

@@ -127,7 +127,7 @@ export function StepLoop({ state, update, ctx }: StepProps) {
           checked={state.autoResume}
           onChange={(on) => update({ autoResume: on })}
           label="Keep training when I reopen the app"
-          description="Browsers can't train while the tab is closed. With this on, the run continues by itself the next time you open Chess Builder."
+          description="Browsers can't train while the tab is closed. With this on, the run continues by itself the next time you open BoardForm."
         />
       </StepSection>
     </div>

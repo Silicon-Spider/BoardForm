@@ -28,11 +28,12 @@ import { formatBytes } from "@/utils/format";
 import { ALL_RECORDS, emitChanges } from "./events";
 import { STORE_NAMES, type StoreName } from "./stores";
 
+/** The app's original name; kept so data saved before the rename to BoardForm stays readable. */
 export const DB_NAME = "chess-builder";
 export const DB_VERSION = 1;
 
 /** Typed schema (docs/ARCHITECTURE.md §4). Index key types are what you query them with. */
-export interface ChessBuilderDB extends DBSchema {
+export interface BoardFormDB extends DBSchema {
   engines: { key: string; value: EngineRecord; indexes: { updatedAt: number } };
   networks: { key: string; value: NetworkRecord; indexes: { updatedAt: number } };
   networkData: { key: string; value: NetworkDataRecord };
@@ -44,7 +45,7 @@ export interface ChessBuilderDB extends DBSchema {
   settings: { key: string; value: SettingRecord };
 }
 
-export type StoreValue<S extends StoreName> = ChessBuilderDB[S]["value"];
+export type StoreValue<S extends StoreName> = BoardFormDB[S]["value"];
 
 // ---------------------------------------------------------------------------------------------
 // Errors
@@ -106,20 +107,20 @@ async function quotaMessage(action: string): Promise<string> {
     const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
     const est = storage && typeof storage.estimate === "function" ? await storage.estimate() : undefined;
     if (est && typeof est.usage === "number" && typeof est.quota === "number" && est.quota > 0) {
-      usage = ` Chess Builder is using ${formatBytes(est.usage)} of the ${formatBytes(est.quota)} this browser allows.`;
+      usage = ` BoardForm is using ${formatBytes(est.usage)} of the ${formatBytes(est.quota)} this browser allows.`;
     }
   } catch {
     /* the estimate is only a nicety */
   }
   return (
-    `Browser storage is full, so Chess Builder could not ${action}.${usage} ` +
+    `Browser storage is full, so BoardForm could not ${action}.${usage} ` +
     "Free up space by deleting datasets, old games or networks you no longer need " +
     "(export a backup first if you want to keep them), then try again."
   );
 }
 
 const UNAVAILABLE_MESSAGE =
-  "This browser is not letting Chess Builder use IndexedDB, so nothing can be saved. " +
+  "This browser is not letting BoardForm use IndexedDB, so nothing can be saved. " +
   "Private / incognito windows and strict privacy settings can disable it — try a normal window, " +
   "or allow site data for this page.";
 
@@ -217,13 +218,13 @@ function emitDatabaseEvent(type: DatabaseEventType, message: string, reloadRequi
 // ---------------------------------------------------------------------------------------------
 // Connection
 
-let dbPromise: Promise<IDBPDatabase<ChessBuilderDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<BoardFormDB>> | null = null;
 /** Bumped whenever the shared connection is replaced, so stale callbacks can be ignored. */
 let generation = 0;
 /** Set once a newer version took over in another tab: every operation must fail until reload. */
 let closedError: StorageError | null = null;
 
-function createSchema(db: IDBPDatabase<ChessBuilderDB>, oldVersion: number): void {
+function createSchema(db: IDBPDatabase<BoardFormDB>, oldVersion: number): void {
   // Version 1 — initial schema. Later versions append `if (oldVersion < N) { ... }` steps.
   if (oldVersion < 1) {
     db.createObjectStore("engines", { keyPath: "id" }).createIndex("updatedAt", "updatedAt");
@@ -247,7 +248,7 @@ function mapOpenError(err: unknown): StorageError {
   if (name === "VersionError") {
     return new StorageError(
       "version-mismatch",
-      "Your saved data was written by a newer version of Chess Builder than the one running in this tab. " +
+      "Your saved data was written by a newer version of BoardForm than the one running in this tab. " +
         "Reload the page to get the latest version.",
       { cause: err },
     );
@@ -258,21 +259,21 @@ function mapOpenError(err: unknown): StorageError {
   if (isQuotaError(err)) {
     return new StorageError(
       "quota-exceeded",
-      "Browser storage is full, so Chess Builder could not open its database. Free up disk space or site data and reload.",
+      "Browser storage is full, so BoardForm could not open its database. Free up disk space or site data and reload.",
       { cause: err },
     );
   }
-  return new StorageError("failed", `Could not open the Chess Builder database: ${errorMessage(err)}`, { cause: err });
+  return new StorageError("failed", `Could not open the BoardForm database: ${errorMessage(err)}`, { cause: err });
 }
 
-async function openDatabase(gen: number): Promise<IDBPDatabase<ChessBuilderDB>> {
+async function openDatabase(gen: number): Promise<IDBPDatabase<BoardFormDB>> {
   if (typeof indexedDB === "undefined" || indexedDB === null) {
     throw new StorageError("unavailable", UNAVAILABLE_MESSAGE);
   }
   let wasBlocked = false;
-  let db: IDBPDatabase<ChessBuilderDB>;
+  let db: IDBPDatabase<BoardFormDB>;
   try {
-    db = await openDB<ChessBuilderDB>(DB_NAME, DB_VERSION, {
+    db = await openDB<BoardFormDB>(DB_NAME, DB_VERSION, {
       upgrade(database, oldVersion) {
         createSchema(database, oldVersion);
       },
@@ -280,8 +281,8 @@ async function openDatabase(gen: number): Promise<IDBPDatabase<ChessBuilderDB>> 
         wasBlocked = true;
         emitDatabaseEvent(
           "blocked",
-          "Chess Builder is open in another tab with an older version that is blocking a database upgrade. " +
-            "Close or reload the other Chess Builder tabs to continue.",
+          "BoardForm is open in another tab with an older version that is blocking a database upgrade. " +
+            "Close or reload the other BoardForm tabs to continue.",
           false,
         );
       },
@@ -292,7 +293,7 @@ async function openDatabase(gen: number): Promise<IDBPDatabase<ChessBuilderDB>> 
         if (blockedVersion === null) {
           emitDatabaseEvent(
             "deleted",
-            "Your saved Chess Builder data was deleted from another tab. Reload this tab to start fresh.",
+            "Your saved BoardForm data was deleted from another tab. Reload this tab to start fresh.",
             true,
           );
           // Local caches re-read (they will see the freshly recreated, empty database).
@@ -303,7 +304,7 @@ async function openDatabase(gen: number): Promise<IDBPDatabase<ChessBuilderDB>> 
         } else {
           closedError = new StorageError(
             "database-closed",
-            "Chess Builder was updated in another tab, so this tab closed its connection to your saved data. " +
+            "BoardForm was updated in another tab, so this tab closed its connection to your saved data. " +
               "Reload this tab to keep working — nothing has been lost.",
           );
           emitDatabaseEvent("version-change", closedError.message, true);
@@ -327,7 +328,7 @@ async function openDatabase(gen: number): Promise<IDBPDatabase<ChessBuilderDB>> 
 }
 
 /** The shared connection (opened on first use). Rejects with a StorageError. */
-export function getDB(): Promise<IDBPDatabase<ChessBuilderDB>> {
+export function getDB(): Promise<IDBPDatabase<BoardFormDB>> {
   if (closedError) return Promise.reject(closedError);
   if (!dbPromise) {
     const gen = ++generation;
@@ -373,7 +374,7 @@ export async function withTransaction<Names extends ArrayLike<StoreName>, Mode e
   action: string,
   storeNames: Names,
   mode: Mode,
-  fn: (tx: IDBPTransaction<ChessBuilderDB, Names, Mode>) => Promise<T>,
+  fn: (tx: IDBPTransaction<BoardFormDB, Names, Mode>) => Promise<T>,
 ): Promise<T> {
   try {
     const db = await getDB();

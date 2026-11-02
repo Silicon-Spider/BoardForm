@@ -23,6 +23,7 @@ const STARTERS = [
   { name: "Blocky", kind: "Blocks" },
   { name: "Classic", kind: "Eval code" },
   { name: "Sprout", kind: "Scratch" },
+  { name: "Neuron", kind: "NNUE" },
 ] as const;
 const HELP_TOPICS = ["getting-started", "blocks", "eval-api", "full-engine", "scratch", "abi", "nnue", "play-and-arena", "limits", "storage"];
 
@@ -95,7 +96,7 @@ async function waitForSeeded(page: Page): Promise<void> {
 async function openLibrary(page: Page, hash = "#/engines"): Promise<void> {
   await page.goto("/" + hash);
   await expect(cards(page).first()).toBeVisible({ timeout: 60_000 });
-  await expect.poll(async () => (await cardNames(page)).filter((n) => STARTERS.some((s) => s.name === n)).length, { timeout: 60_000 }).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => (await cardNames(page)).filter((n) => STARTERS.some((s) => s.name === n)).length, { timeout: 60_000 }).toBeGreaterThanOrEqual(STARTERS.length);
 }
 
 async function engineList(page: Page): Promise<EngineSummary[]> {
@@ -236,17 +237,18 @@ async function expectNoHorizontalOverflow(page: Page, where: string): Promise<vo
 test("library: starter engines, search, kind filter and sort (remembered)", async ({ page }) => {
   const errors = trackErrors(page);
   await openLibrary(page);
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(4);
   for (const s of STARTERS) {
     const c = card(page, s.name);
     await expect(c.locator(".engines-card-badges")).toContainText(s.kind);
     await expect(c.locator(".engines-card-badges")).toContainText("Starter");
     await expect(c.locator(".engines-card-meta")).toContainText("Not built yet");
   }
-  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout"]);
-  await expect(page.locator(".engines-count")).toHaveText("3 engines");
+  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+  await expect(page.locator(".engines-count")).toHaveText("4 engines");
+  await expect(card(page, "Neuron").locator(".engines-card-meta")).toContainText("Starter network (128 SCReLU)");
 
-  // A fourth engine, older than the starters, so every sort order gives a different list.
+  // A fifth engine, older than the starters, so every sort order gives a different list.
   await page.evaluate(async () => {
     const s = (await import(String("/src/storage/index.ts"))) as StorageModule;
     const t = (await import(String("/src/engine-host/templates.ts"))) as TemplatesModule;
@@ -268,8 +270,8 @@ test("library: starter engines, search, kind filter and sort (remembered)", asyn
       tags: ["zoo"],
     });
   });
-  await expect(cards(page)).toHaveCount(4);
-  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout", "Aardvark"]);
+  await expect(cards(page)).toHaveCount(5);
+  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout", "Neuron", "Aardvark"]);
 
   // Search: names, descriptions and tags, any case; "/" focuses the box, Esc clears it.
   const search = page.getByRole("searchbox", { name: "Search engines" });
@@ -278,18 +280,18 @@ test("library: starter engines, search, kind filter and sort (remembered)", asyn
   await expect(search).toBeFocused();
   await page.keyboard.type("sprout");
   await expect(cards(page)).toHaveCount(1);
-  await expect(page.locator(".engines-count")).toHaveText("1 of 4 engines");
+  await expect(page.locator(".engines-count")).toHaveText("1 of 5 engines");
   await search.fill("SINGLE-FILE");
   expect(await cardNames(page)).toEqual(["Sprout"]);
   await search.fill("starter");
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(4);
   await search.fill("zoo");
   expect(await cardNames(page)).toEqual(["Aardvark"]);
   await search.fill("zzz nothing");
   await expect(page.getByText("No engines match")).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(search).toHaveValue("");
-  await expect(cards(page)).toHaveCount(4);
+  await expect(cards(page)).toHaveCount(5);
   await search.fill("classic");
   await search.press("Escape");
   await expect(search).toHaveValue("");
@@ -309,19 +311,21 @@ test("library: starter engines, search, kind filter and sort (remembered)", asyn
   // The nav link opens the plain library again.
   await backToLibrary(page);
   await expect(page.getByRole("searchbox", { name: "Search engines" })).toHaveValue("");
-  await expect(cards(page)).toHaveCount(4);
+  await expect(cards(page)).toHaveCount(5);
 
   // Kind filter (with counts) and its empty state.
   const kindSelect = kindSelectOf(page);
   const sortSelect = sortSelectOf(page);
-  await expect(kindSelect.locator("option")).toHaveText(["All kinds (4)", "Blocks (1)", "Eval code (1)", "Full code (1)", "Scratch (1)", "NNUE (0)", "WASM (0)"]);
+  await expect(kindSelect.locator("option")).toHaveText(["All kinds (5)", "Blocks (1)", "Eval code (1)", "Full code (1)", "Scratch (1)", "NNUE (1)", "WASM (0)"]);
   await kindSelect.selectOption("eval");
   expect(await cardNames(page)).toEqual(["Classic"]);
   await kindSelect.selectOption("nnue");
-  await expect(page.getByText("You have no NNUE engines yet.")).toBeVisible();
-  await page.getByRole("button", { name: "New NNUE engine" }).click();
+  expect(await cardNames(page)).toEqual(["Neuron"]);
+  await kindSelect.selectOption("wasm");
+  await expect(page.getByText("You have no WASM engines yet.")).toBeVisible();
+  await page.getByRole("button", { name: "New WASM engine" }).click();
   await expect(dialog(page)).toContainText("Step 2 of 2");
-  await expect(dialog(page).locator(".engines-wizard-chosen")).toContainText("NNUE");
+  await expect(dialog(page).locator(".engines-wizard-chosen")).toContainText("Upload .wasm");
   await dialog(page).getByRole("button", { name: "Cancel" }).click();
   await expect(dialog(page)).toHaveCount(0);
   await expect(page).not.toHaveURL(/new=1/);
@@ -329,11 +333,11 @@ test("library: starter engines, search, kind filter and sort (remembered)", asyn
   // Sort orders.
   await kindSelect.selectOption("all");
   await sortSelect.selectOption("name");
-  expect(await cardNames(page)).toEqual(["Aardvark", "Blocky", "Classic", "Sprout"]);
+  expect(await cardNames(page)).toEqual(["Aardvark", "Blocky", "Classic", "Neuron", "Sprout"]);
   await sortSelect.selectOption("kind");
-  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Aardvark", "Sprout"]);
+  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Aardvark", "Sprout", "Neuron"]);
   await sortSelect.selectOption("created");
-  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout", "Aardvark"]);
+  expect(await cardNames(page)).toEqual(["Blocky", "Classic", "Sprout", "Neuron", "Aardvark"]);
 
   // Filter and sort are remembered across a reload.
   await sortSelect.selectOption("name");
@@ -405,7 +409,7 @@ test("wizard: blocks, evaluation-code and full-code engines open in the Workshop
 
   // The library shows all three with their build state.
   await backToLibrary(page);
-  await expect(cards(page)).toHaveCount(6);
+  await expect(cards(page)).toHaveCount(7);
   for (const n of ["My blocks engine", "Eval Tester", "My engine"]) await expect(card(page, n).locator(".engines-card-meta")).toContainText("Built ·");
   expect(errors).toEqual([]);
 });
@@ -434,10 +438,12 @@ test("wizard: scratch (minimal and empty) and NNUE engines; a reload keeps the w
     await backToLibrary(page);
   }
 
-  // NNUE without a network: it builds and uses the fallback evaluation.
+  // NNUE without a network: it builds and uses the fallback evaluation. The starter network is
+  // offered, but "None" can be chosen.
   await openWizard(page);
   await approach(page, "NNUE").click();
-  await expect(dialog(page)).toContainText("You have no networks yet");
+  await expect(dialog(page).locator(".engines-option", { hasText: "Starter network (128 SCReLU)" })).toBeVisible();
+  await dialog(page).locator(".engines-option", { hasText: "Uses the fallback evaluation" }).click();
   await expect(dialog(page).locator(".engines-option.is-selected")).toContainText("None");
   const nnueId = await createFromWizard(page);
   const nnue = await engineRecord(page, nnueId);
@@ -625,7 +631,7 @@ test("library: duplicate, export, import round trip, and delete with confirmatio
   const exported = testInfo.outputPath(download.suggestedFilename());
   await download.saveAs(exported);
   const json = JSON.parse(await readFile(exported, "utf8")) as { format: string; engine: { name: string; build: unknown } };
-  expect(json.format).toBe("chess-builder-engine");
+  expect(json.format).toBe("boardform-engine");
   expect(json.engine.name).toBe("Classic (copy)");
   expect(json.engine.build).toBeNull();
   await expect(toast(page, "Exported “Classic (copy)”")).toBeVisible();
@@ -641,11 +647,11 @@ test("library: duplicate, export, import round trip, and delete with confirmatio
 
   // Importing something that is not an engine file shows why, and changes nothing.
   await backToLibrary(page);
-  await expect(cards(page)).toHaveCount(5);
+  await expect(cards(page)).toHaveCount(6);
   await chooseFile(page, () => page.getByRole("button", { name: "Import engine" }).click(), {
     name: "backup.json",
     mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify({ format: "chess-builder-backup", version: 1, stores: {} })),
+    buffer: Buffer.from(JSON.stringify({ format: "boardform-backup", version: 1, stores: {} })),
   });
   await expect(toast(page, "Could not import the engine")).toContainText("restore it from Settings");
   await chooseFile(page, () => page.getByRole("button", { name: "Import engine" }).click(), {
@@ -655,7 +661,7 @@ test("library: duplicate, export, import round trip, and delete with confirmatio
   });
   await expect(toast(page, "Could not import the engine").last()).toContainText("not readable JSON");
   await expect(page).toHaveURL(/#\/engines$/);
-  await expect(cards(page)).toHaveCount(5);
+  await expect(cards(page)).toHaveCount(6);
 
   // Delete asks first: Cancel keeps it, confirming removes it.
   const target = card(page, "Classic (copy) (imported)");
@@ -680,7 +686,7 @@ test("library: duplicate, export, import round trip, and delete with confirmatio
   await dialog(page).getByRole("button", { name: "Delete engine" }).click();
   await expect(card(page, "Sprout")).toHaveCount(0);
   await page.reload();
-  await expect(cards(page)).toHaveCount(3, { timeout: 30_000 });
+  await expect(cards(page)).toHaveCount(4, { timeout: 30_000 });
   expect(await cardNames(page)).not.toContain("Sprout");
   expect(errors).toEqual([]);
 });
@@ -733,7 +739,7 @@ test("library: changes made in another tab show up without a reload", async ({ p
   await other.getByRole("menuitem", { name: "Delete" }).click();
   await dialog(other).getByRole("button", { name: "Delete engine" }).click();
   await expect(card(page, "Renamed elsewhere")).toHaveCount(0, { timeout: 15_000 });
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(4);
   await other.close();
   expect([...errors, ...otherErrors]).toEqual([]);
 });
@@ -754,14 +760,16 @@ test("library: empty state, restore starter engines without duplicates", async (
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Restore starter engines" }).click();
   await expect(toast(page, "Starter engines restored")).toBeVisible();
-  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page)).toHaveCount(4);
+  // Neuron comes back with its network (which was never deleted, so it is not duplicated).
+  expect((await engineList(page)).find((e) => e.name === "Neuron")?.networkId).toBe("starter-network-hl128");
 
   // Restoring again while the starters are untouched adds nothing.
   await page.goto("/#/settings?section=storage");
   const restore = page.locator(".settings-row", { hasText: "Restore starter engines" }).getByRole("button", { name: "Restore starter engines" });
   await restore.click();
   await expect(toast(page, "Your starter engines are all here")).toBeVisible();
-  expect((await engineList(page)).map((e) => e.name).sort()).toEqual(["Blocky", "Classic", "Sprout"]);
+  expect((await engineList(page)).map((e) => e.name).sort()).toEqual(["Blocky", "Classic", "Neuron", "Sprout"]);
 
   // An edited starter is kept, and a fresh copy comes back next to it; a deleted one comes back.
   await page.evaluate(async () => {
@@ -774,7 +782,7 @@ test("library: empty state, restore starter engines without duplicates", async (
   await restore.click();
   await expect(page.locator(".toast .small", { hasText: /^Classic and Sprout are back in your library\.$/ })).toBeVisible();
   const names = (await engineList(page)).map((e) => e.name).sort();
-  expect(names).toEqual(["Blocky", "Classic", "Classic", "Sprout"]);
+  expect(names).toEqual(["Blocky", "Classic", "Classic", "Neuron", "Sprout"]);
   expect(errors).toEqual([]);
 });
 
@@ -905,7 +913,7 @@ test("settings: backup export, delete all data, import restores, storage estimat
   const usage = page.locator(".settings-row", { hasText: "Storage used" });
   await expect(usage).toContainText(/(of .* this browser allows for the site|used; the browser does not say)/);
   const counts = page.locator(".settings-counts");
-  await expect(counts.locator(".settings-count", { hasText: "Engines" })).toContainText("4");
+  await expect(counts.locator(".settings-count", { hasText: "Engines" })).toContainText("5");
   await usage.getByRole("button", { name: "Refresh" }).click();
   await expect(usage).toContainText(/(of .* this browser allows for the site|used; the browser does not say)/);
   const persistRow = page.locator(".settings-row", { hasText: "Keep my data" });
@@ -920,14 +928,14 @@ test("settings: backup export, delete all data, import restores, storage estimat
   const exportButton = page.getByRole("button", { name: "Export backup" });
   await page.getByLabel("Include saved games").uncheck();
   const [download] = await Promise.all([page.waitForEvent("download"), exportButton.click()]);
-  expect(download.suggestedFilename()).toMatch(/^chess-builder-backup-\d{4}-\d{2}-\d{2}\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^boardform-backup-\d{4}-\d{2}-\d{2}\.json$/);
   const backupPath = testInfo.outputPath(download.suggestedFilename());
   await download.saveAs(backupPath);
   await expect(toast(page, "Backup saved")).toBeVisible();
   const backup = JSON.parse(await readFile(backupPath, "utf8")) as { format: string; options: { includeGames: boolean }; stores: Record<string, unknown[]> };
-  expect(backup.format).toBe("chess-builder-backup");
+  expect(backup.format).toBe("boardform-backup");
   expect(backup.options.includeGames).toBe(false);
-  expect(backup.stores.engines).toHaveLength(4);
+  expect(backup.stores.engines).toHaveLength(5);
   expect(backup.stores.games).toBeUndefined();
 
   // Delete all data: the button stays disabled until DELETE is typed; Cancel changes nothing.
@@ -937,14 +945,14 @@ test("settings: backup export, delete all data, import restores, storage estimat
   await dialog(page).getByLabel("Type DELETE to confirm").fill("delete");
   await expect(confirmDelete).toBeDisabled();
   await dialog(page).getByRole("button", { name: "Cancel" }).click();
-  expect((await engineList(page)).length).toBe(4);
+  expect((await engineList(page)).length).toBe(5);
   await page.getByRole("button", { name: "Delete all data…" }).click();
   await dialog(page).getByLabel("Type DELETE to confirm").fill("DELETE");
   await dialog(page).getByRole("button", { name: "Delete everything" }).click();
   await expect(toast(page, "All data deleted")).toBeVisible({ timeout: 30_000 });
   await expect(dialog(page)).toHaveCount(0);
-  await expect.poll(async () => (await engineList(page)).map((e) => e.name).sort()).toEqual(["Blocky", "Classic", "Sprout"]);
-  await expect(counts.locator(".settings-count", { hasText: "Engines" })).toContainText("3");
+  await expect.poll(async () => (await engineList(page)).map((e) => e.name).sort()).toEqual(["Blocky", "Classic", "Neuron", "Sprout"]);
+  await expect(counts.locator(".settings-count", { hasText: "Engines" })).toContainText("4");
   expect(await page.evaluate(async () => ((await import(String("/src/storage/index.ts"))) as StorageModule).settingsRepo.get("library.sort", "unset"))).toBe("unset");
   // The theme survives.
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -953,31 +961,32 @@ test("settings: backup export, delete all data, import restores, storage estimat
   await chooseFile(page, () => page.getByRole("button", { name: "Import backup…" }).click(), {
     name: "engine.json",
     mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify({ format: "chess-builder-engine", version: 1, engine: {} })),
+    buffer: Buffer.from(JSON.stringify({ format: "boardform-engine", version: 1, engine: {} })),
   });
   await dialog(page).getByRole("button", { name: "Restore backup" }).click();
   await expect(page.locator(".settings-import .callout.danger")).toContainText("engine.json could not be restored.");
   await expect(page.locator(".settings-import .callout.danger")).toContainText("Nothing was changed.");
-  expect((await engineList(page)).length).toBe(3);
+  expect((await engineList(page)).length).toBe(4);
 
   // Cancelling the confirmation does nothing either.
   await chooseFile(page, () => page.getByRole("button", { name: "Import backup…" }).click(), backupPath);
   await expect(dialog(page)).toContainText("Restore this backup?");
   await dialog(page).getByRole("button", { name: "Cancel" }).click();
-  expect((await engineList(page)).length).toBe(3);
+  expect((await engineList(page)).length).toBe(4);
 
   // The real restore brings everything back, then offers to remove the starters seeded meanwhile.
   await chooseFile(page, () => page.getByRole("button", { name: "Import backup…" }).click(), backupPath);
   await dialog(page).getByRole("button", { name: "Restore backup" }).click();
   await expect(toast(page, "Backup restored")).toBeVisible({ timeout: 30_000 });
   const result = page.locator(".settings-import-result");
-  await expect(result).toContainText("4 engines");
+  await expect(result).toContainText("5 engines");
+  // Neuron has a fixed id, so the backup's copy replaced the fresh one: only three duplicates.
   await expect(result).toContainText("untouched duplicates of the starter engines (3 engines)");
-  expect((await engineList(page)).length).toBe(7);
+  expect((await engineList(page)).length).toBe(8);
   await result.getByRole("button", { name: "Remove duplicates" }).click();
   await expect(toast(page, "Removed 3 duplicate starter engines")).toBeVisible();
   const after = await engineList(page);
-  expect(after.map((e) => e.name).sort()).toEqual(["Backup probe", "Blocky", "Classic", "Sprout"]);
+  expect(after.map((e) => e.name).sort()).toEqual(["Backup probe", "Blocky", "Classic", "Neuron", "Sprout"]);
   expect(after.some((e) => e.id === probeId)).toBe(true);
   expect(await page.evaluate(async () => ((await import(String("/src/storage/index.ts"))) as StorageModule).settingsRepo.get("library.sort", "unset"))).toBe("name");
   const b = await buildById(page, probeId);
@@ -985,7 +994,7 @@ test("settings: backup export, delete all data, import restores, storage estimat
 
   // The library shows the restored engines, sorted the restored way.
   await backToLibrary(page);
-  expect(await cardNames(page)).toEqual(["Backup probe", "Blocky", "Classic", "Sprout"]);
+  expect(await cardNames(page)).toEqual(["Backup probe", "Blocky", "Classic", "Neuron", "Sprout"]);
   expect(errors).toEqual([]);
 });
 
@@ -1049,7 +1058,7 @@ test("settings: delete all data stops a running match and dataset generation fir
       running: a.arena.isRunning(matchId) || t.datasets.isGenerating(datasetId),
     };
   }, ids);
-  expect(left).toEqual({ engines: ["Blocky", "Classic", "Sprout"], matches: 0, games: 0, datasets: 0, chunks: 0, running: false });
+  expect(left).toEqual({ engines: ["Blocky", "Classic", "Neuron", "Sprout"], matches: 0, games: 0, datasets: 0, chunks: 0, running: false });
   // The pages that showed them are empty and healthy.
   await page.goto("/#/arena");
   await expect(page.locator(".app-main")).not.toContainText("Busy match");
@@ -1068,7 +1077,7 @@ test("help: every topic renders, links resolve, TOC scrolls, search filters, cop
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/#/help");
   await waitForSeeded(page);
-  await expect(page.locator(".help-main h1")).toHaveText("Learn Chess Builder");
+  await expect(page.locator(".help-main h1")).toHaveText("Learn BoardForm");
 
   // Every topic renders, and every internal link in it points somewhere real.
   const anchorsByTopic = new Map<string, string[]>();

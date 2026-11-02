@@ -1,17 +1,17 @@
 # Saving and backups
 
-Chess Builder runs entirely in your browser, and that is also where it keeps your work. This page explains where your data lives, how to keep it safe, and how to move it between browsers and computers.
+BoardForm runs entirely in your browser, and that is also where it keeps your work. This page explains where your data lives, how to keep it safe, and how to move it between browsers and computers.
 
 ## Where your data lives
 
-Everything is stored in your browser's built-in database (IndexedDB), in a database called `chess-builder`:
+Everything is stored in your browser's built-in database (IndexedDB), in a database called `chess-builder` (the app's original name):
 
 - **engines** — their blocks or source files, options and the last compiled build,
 - **networks** — the network files engines load, plus the full-precision weights and optimizer state needed to keep training them,
 - **datasets** — training positions, stored in chunks,
 - **games** and **matches**, **training runs** with their charts and logs, and your **settings**.
 
-Nothing is uploaded to a server. The data belongs to this browser profile on this computer: another browser, another profile or another device starts empty. If you open Chess Builder in several tabs, they share the same data and changes made in one tab show up in the others.
+Nothing is uploaded to a server. The data belongs to this browser profile on this computer: another browser, another profile or another device starts empty. If you open BoardForm in several tabs, they share the same data and changes made in one tab show up in the others.
 
 ## Saving happens automatically
 
@@ -21,9 +21,9 @@ Long jobs save checkpoints as they run. Training runs with **Keep training when 
 
 ## Keeping your data safe
 
-Browsers may delete a website's data on their own when the computer runs low on disk space — unless the site has been granted **persistent storage**. Chess Builder asks for it the first time it starts. Chrome and Edge decide by themselves (for example based on how much you use the site); Firefox may ask you.
+Browsers may delete a website's data on their own when the computer runs low on disk space — unless the site has been granted **persistent storage**. BoardForm asks for it the first time it starts. Chrome and Edge decide by themselves (for example based on how much you use the site); Firefox may ask you.
 
-**Storage & data** in [Settings](#/settings?section=storage) shows how much space Chess Builder uses, what is stored, and whether your data is persistent — **Keep my data** asks the browser for persistent storage if it hasn't granted it yet.
+**Storage & data** in [Settings](#/settings?section=storage) shows how much space BoardForm uses, what is stored, and whether your data is persistent — **Keep my data** asks the browser for persistent storage if it hasn't granted it yet.
 
 Your data is also deleted when you clear your browser's history or site data for this site, and some browsers — notably Safari — may remove the data of sites you haven't used for a while.
 
@@ -50,13 +50,13 @@ You can also move single items:
 | A dataset | **Export .cbds** in the NNUE Lab. | **Import** on the Lab's Datasets page: `.cbds` files, or text files with one `FEN \| score \| result` line per position. |
 | A game | **Download PGN** from the Play page's **Saved games**. | **Import PGN** (in **Saved games**, or **Import PGN…** in Analysis) opens a game on the analysis board. |
 
-An engine file is the easiest way to share an engine with a friend: they import it into their own Chess Builder.
+An engine file is the easiest way to share an engine with a friend: they import it into their own BoardForm.
 
 ## Clearing data
 
 - **Delete single items** where you see them: engines on the Engines page, networks and datasets in the NNUE Lab, games in **Saved games**, matches in the Arena. Every deletion asks for confirmation first. A network or dataset that a running job is using can't be deleted until the job is finished or stopped.
 - **Deleting an engine** keeps the games it played and the network it used. **Deleting a network** doesn't delete the engines that use it: those engines can't start any more and say so until you choose another network for them.
-- **Restore starter engines** in [Settings](#/settings?section=storage) → **Storage & data** brings back fresh copies of the starter engines you deleted or changed (Blocky, Classic and Sprout); your own engines, and the starters you changed, are kept as they are.
+- **Restore starter engines** in [Settings](#/settings?section=storage) → **Storage & data** brings back fresh copies of the starter engines you deleted or changed (Blocky, Classic, Sprout and Neuron, with the starter network); your own engines, and the starters you changed, are kept as they are.
 - **Delete all data** in [Settings](#/settings?section=danger) → **Danger zone** deletes every engine, network, dataset, saved game, match, training run and setting stored in this browser. The starter engines are added again afterwards and your colour theme is kept, but nothing else comes back — export a backup first.
 
 ## Private windows

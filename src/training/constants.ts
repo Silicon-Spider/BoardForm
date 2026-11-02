@@ -60,7 +60,7 @@ export const bestDataId = (runId: string): string => `best:${runId}`;
 /** Key for RunLocks of a dataset being written (one writer per dataset across tabs). */
 export const datasetLockKey = (datasetId: string): string => `dataset:${datasetId}`;
 /**
- * Web Lock names: "chess-builder:run:<id>" makes sure only one tab executes a run;
- * "chess-builder:dataset:<id>" that only one tab appends to a dataset.
+ * Web Lock names: "boardform:run:<id>" makes sure only one tab executes a run;
+ * "boardform:dataset:<id>" that only one tab appends to a dataset.
  */
-export const runLockName = (key: string): string => (key.startsWith("dataset:") ? `chess-builder:${key}` : `chess-builder:run:${key}`);
+export const runLockName = (key: string): string => (key.startsWith("dataset:") ? `boardform:${key}` : `boardform:run:${key}`);

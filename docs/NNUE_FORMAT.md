@@ -1,4 +1,4 @@
-# NNUE networks in Chess Builder
+# NNUE networks in BoardForm
 
 This file is the single source of truth shared by the trainer (TypeScript, `src/nnue/`),
 the JS reference inference (`src/nnue/reference.ts`) and the engine-side inference

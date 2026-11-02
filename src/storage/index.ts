@@ -11,7 +11,7 @@ export {
   isQuotaError,
   onDatabaseEvent,
   getDatabaseStatus,
-  type ChessBuilderDB,
+  type BoardFormDB,
   type DatabaseEvent,
   type DatabaseEventType,
   type StorageErrorCode,
@@ -62,4 +62,12 @@ export {
   type StoreCounts,
 } from "./backup";
 export { requestPersistentStorage, storageEstimate, type StorageEstimateInfo } from "./persist";
-export { ensureSeeded, whenSeeded, SEED_FLAG_KEY } from "./seed";
+export {
+  ensureSeeded,
+  whenSeeded,
+  SEED_FLAG_KEY,
+  NETWORK_SEED_FLAG_KEY,
+  STARTER_NETWORK_ID,
+  STARTER_NNUE_ENGINE_ID,
+  STARTER_NETWORK_PATH,
+} from "./seed";

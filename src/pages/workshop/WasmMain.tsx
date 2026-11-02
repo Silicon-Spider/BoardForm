@@ -104,7 +104,7 @@ export function WasmMain({ view, draft, session }: { view: EngineRecord; draft: 
   if (!view.wasm || view.wasm.byteLength === 0) {
     return (
       <div className="workshop-wasm">
-        <EmptyState title="No WebAssembly module" description="Upload a .wasm file that implements the Chess Builder Engine ABI (see Help → Engine ABI)." action={actions} />
+        <EmptyState title="No WebAssembly module" description="Upload a .wasm file that implements the BoardForm Engine ABI (see Help → Engine ABI)." action={actions} />
       </div>
     );
   }

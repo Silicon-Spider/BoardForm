@@ -1,4 +1,4 @@
-/* Chess Builder design system. Tokens first, then base elements, then shared component classes.
+/* BoardForm design system. Tokens first, then base elements, then shared component classes.
    Page-specific styles live next to each page with a page-name prefix (.play-*, .arena-*, ...). */
 
 :root {

@@ -13,7 +13,7 @@ Choose **From scratch** in the **New engine** wizard on the [Engines](#/engines)
 
 The minimal engine is deliberately simple — no transposition table, no pruning tricks — so it is easy to read and plays clearly weaker than the template engine. Its header lists the improvements that help most, in order.
 
-> **Note** An engine built from the empty skeleton can't play yet: it returns "no move" for every position and writes a TODO line to the engine console. The Test panel's **Search** then says *The engine produced no move*, and in a game the engine loses for producing no move — Chess Builder never mistakes it for checkmate or stalemate.
+> **Note** An engine built from the empty skeleton can't play yet: it returns "no move" for every position and writes a TODO line to the engine console. The Test panel's **Search** then says *The engine produced no move*, and in a game the engine loses for producing no move — BoardForm never mistakes it for checkmate or stalemate.
 
 You can split your engine into several files (**File** → **New file…** in the Workshop) and import between them with `import { ... } from "./board";`. Compilation starts at the entry file, `main.ts`.
 

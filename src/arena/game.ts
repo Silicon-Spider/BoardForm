@@ -258,7 +258,7 @@ export async function runEngineGame(opts: PlayEngineGameOptions, engines: { whit
   const final = end;
   const tags: Record<string, string> = {
     Event: opts.event ?? "Engine game",
-    Site: "Chess Builder",
+    Site: "BoardForm",
     Round: opts.round ?? "?",
     White: white.name,
     Black: black.name,

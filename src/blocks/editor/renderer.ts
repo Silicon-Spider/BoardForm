@@ -1,4 +1,4 @@
-// "chess-builder" renderer: zelos (rounded, touch-friendly) with one fix.
+// "boardform" renderer: zelos (rounded, touch-friendly) with one fix.
 //
 // Zelos draws dropdowns on shadow blocks without their own border rect and makes the whole
 // block their click target. Our square blocks are shadows with two dropdowns ("our ▾ 7th ▾"),
@@ -8,18 +8,18 @@
 
 import * as Blockly from "blockly";
 
-export const RENDERER_NAME = "chess-builder";
+export const RENDERER_NAME = "boardform";
 
-class ChessBuilderConstants extends Blockly.zelos.ConstantProvider {
+class BoardFormConstants extends Blockly.zelos.ConstantProvider {
   constructor() {
     super();
     this.FIELD_DROPDOWN_NO_BORDER_RECT_SHADOW = false;
   }
 }
 
-class ChessBuilderRenderer extends Blockly.zelos.Renderer {
+class BoardFormRenderer extends Blockly.zelos.Renderer {
   protected override makeConstants_(): Blockly.zelos.ConstantProvider {
-    return new ChessBuilderConstants();
+    return new BoardFormConstants();
   }
 }
 
@@ -31,5 +31,5 @@ export function registerRenderer(): void {
   if (Blockly.registry.hasItem(Blockly.registry.Type.RENDERER, RENDERER_NAME)) {
     Blockly.registry.unregister(Blockly.registry.Type.RENDERER, RENDERER_NAME);
   }
-  Blockly.blockRendering.register(RENDERER_NAME, ChessBuilderRenderer);
+  Blockly.blockRendering.register(RENDERER_NAME, BoardFormRenderer);
 }

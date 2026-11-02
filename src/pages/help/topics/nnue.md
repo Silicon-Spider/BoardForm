@@ -1,16 +1,16 @@
 # NNUE networks
 
-Instead of writing evaluation rules by hand, you can let an engine **learn** them. Chess Builder trains small neural networks of the NNUE kind — the technique behind today's strongest engines — from games your engines play against themselves. You can watch the training live, let it run in the background, and keep improving a network over many sessions.
+Instead of writing evaluation rules by hand, you can let an engine **learn** them. BoardForm trains small neural networks of the NNUE kind — the technique behind today's strongest engines — from games your engines play against themselves. You can watch the training live, let it run in the background, and keep improving a network over many sessions.
 
 ## What NNUE is
 
 NNUE stands for *efficiently updatable neural network*. The network looks at every piece on the board and outputs a score; nobody tells it that knights like the centre or that passed pawns are dangerous — it learns that from data.
 
-The "efficiently updatable" part is the trick that makes it fast enough for a search: the first layer is just a sum of one weight row per piece, so when a move changes two or three pieces the sum can be updated instead of recomputed. (Chess Builder's engine recomputes the sums at every evaluation, using SIMD to stay fast. Updating them incrementally is a great [Full engine code](#/help/full-engine?section=ideas-to-try) project.)
+The "efficiently updatable" part is the trick that makes it fast enough for a search: the first layer is just a sum of one weight row per piece, so when a move changes two or three pieces the sum can be updated instead of recomputed. (BoardForm's engine recomputes the sums at every evaluation, using SIMD to stay fast. Updating them incrementally is a great [Full engine code](#/help/full-engine?section=ideas-to-try) project.)
 
 ## The network
 
-Every Chess Builder network has the shape **(768 → HL) × 2 → 1**:
+Every BoardForm network has the shape **(768 → HL) × 2 → 1**:
 
 - **768 inputs:** one for every combination of colour (2), piece type (6) and square (64). A position switches on one input per piece on the board.
 - **A hidden layer of HL neurons, seen from both sides.** The inputs are numbered twice — from White's point of view and from Black's, each time "own pieces first", with the board flipped for Black. Both perspectives share the same weights and produce two *accumulators* of HL numbers each.
@@ -23,7 +23,7 @@ Inside the engine the weights are stored as integers (*quantized*), and the app 
 
 ## Training data
 
-A network learns from **positions with known outcomes**. Chess Builder makes them with *self-play*: an engine plays many games against itself, starting each game with a few random moves so the games differ. For every position it records:
+A network learns from **positions with known outcomes**. BoardForm makes them with *self-play*: an engine plays many games against itself, starting each game with a few random moves so the games differ. For every position it records:
 
 - the **search score** the engine found (White's point of view), and
 - the **result** of the game (White won, draw, Black won).
@@ -31,6 +31,8 @@ A network learns from **positions with known outcomes**. Chess Builder makes the
 Positions that would teach the wrong thing are skipped: positions in check, positions where the move played was a capture or promotion, scores of ±3000 or more, and the first few moves of each game. The network is trained to predict a blend of both signals: `λ × sigmoid(score / 400) + (1 − λ) × result`, where λ — the *eval weight* — is 0.75 by default.
 
 Positions are stored compactly (32 bytes each) in **datasets**, in chunks of 16 384 positions.
+
+> **Note** The app comes with a **starter network** (HL = 128, SCReLU) and the engine **Neuron** that plays it. It was trained on 5 million positions from self-play of the stock hand-crafted evaluation, and plays about as strong as Classic. Pick it as the starting point of a run to **continue** training it or to **widen** it.
 
 ## The NNUE Lab
 
@@ -78,7 +80,7 @@ A run's page shows what it is doing — self-play, training or evaluating — an
 
 Training and dataset generation are not tied to the Lab page: switch to another page — play a game, run a match — and they keep going. The header shows how many jobs are running; click it to see their progress.
 
-Browsers can't run anything once the tab is closed, so runs save checkpoints to the database as they go. **Pause** saves a checkpoint and stops the workers; **Stop** ends the run now and keeps the best network so far. Runs with **Keep training when I reopen the app** switched on start again by themselves when you reopen Chess Builder; others are marked as interrupted and wait for you. If you open the app in several tabs, only one of them runs a given job.
+Browsers can't run anything once the tab is closed, so runs save checkpoints to the database as they go. **Pause** saves a checkpoint and stops the workers; **Stop** ends the run now and keeps the best network so far. Runs with **Keep training when I reopen the app** switched on start again by themselves when you reopen BoardForm; others are marked as interrupted and wait for you. If you open the app in several tabs, only one of them runs a given job.
 
 How many workers may run at once — self-play workers, Arena games played at the same time and trainer threads — is set under **Background workers** in [Settings](#/settings?section=engines).
 

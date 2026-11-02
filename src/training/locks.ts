@@ -1,4 +1,4 @@
-// Web Locks for runs: the tab that executes a run holds "chess-builder:run:<id>" until it stops,
+// Web Locks for runs: the tab that executes a run holds "boardform:run:<id>" until it stops,
 // so a second tab (or a reload racing the old page) never runs it twice. Without the Web Locks
 // API every acquire succeeds (single-tab behaviour).
 import { runLockName } from "./constants";

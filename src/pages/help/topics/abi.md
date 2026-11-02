@@ -1,6 +1,6 @@
 # Engine ABI and .wasm uploads
 
-Every engine in Chess Builder is a WebAssembly module that implements one small interface, the **Chess Builder Engine ABI**. The engines you build in the app implement it in AssemblyScript (`main.ts` in the template, or your own [scratch](#/help/scratch) engine). But any language that compiles to `wasm32` — C, C++, Rust, Zig and others — can implement it too, and you can upload the result as a `.wasm` file: a **WASM** engine.
+Every engine in BoardForm is a WebAssembly module that implements one small interface, the **BoardForm Engine ABI**. The engines you build in the app implement it in AssemblyScript (`main.ts` in the template, or your own [scratch](#/help/scratch) engine). But any language that compiles to `wasm32` — C, C++, Rust, Zig and others — can implement it too, and you can upload the result as a `.wasm` file: a **WASM** engine.
 
 This page starts with a friendly overview and practical tips for uploading, followed by the complete specification.
 
@@ -24,7 +24,7 @@ app                                   your engine
 
 ## Uploading a .wasm engine
 
-Click **New engine** on the [Engines](#/engines) page, choose **Upload .wasm** and drop your `.wasm` file. Before the engine is created, Chess Builder inspects the module and lists **errors** (the module can't be used as an engine) and **warnings** (it works, with something missing or worked around), along with the optional features it found.
+Click **New engine** on the [Engines](#/engines) page, choose **Upload .wasm** and drop your `.wasm` file. Before the engine is created, BoardForm inspects the module and lists **errors** (the module can't be used as an engine) and **warnings** (it works, with something missing or worked around), along with the optional features it found.
 
 A WASM engine opens in the Workshop on its **Module** view: its exports and imports, the inspection results, and **Replace module…** to upload a new build of your engine without losing its games and settings. If the module exports the NNUE functions you can attach a network there too.
 
@@ -60,7 +60,7 @@ If your module imports **any other function** under `"env"` (or under a module t
 
 ### WASI
 
-Many toolchains target WASI by default (wasi-sdk for C/C++, Rust's `wasm32-wasip1`, Zig's `wasm32-wasi`, TinyGo). Chess Builder includes a small WASI preview 1 shim (`wasi_snapshot_preview1`, also `wasi_unstable`):
+Many toolchains target WASI by default (wasi-sdk for C/C++, Rust's `wasm32-wasip1`, Zig's `wasm32-wasi`, TinyGo). BoardForm includes a small WASI preview 1 shim (`wasi_snapshot_preview1`, also `wasi_unstable`):
 
 - **Works:** writing to stdout and stderr (each line appears in the engine console), clocks, random numbers, `sched_yield`, `proc_exit` (ends the current call), and empty arguments and environment variables.
 - **Doesn't:** files and directories. Any other WASI function returns `ENOSYS`, with a warning.

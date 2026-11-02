@@ -500,7 +500,7 @@ export function Workshop({ stored, query }: { stored: EngineRecord; query: URLSe
     };
   }, []);
   useEffect(() => {
-    document.title = `${view.name} · Workshop · Chess Builder`;
+    document.title = `${view.name} · Workshop · BoardForm`;
   }, [view.name]);
 
   // --- resizable split ----------------------------------------------------------------------

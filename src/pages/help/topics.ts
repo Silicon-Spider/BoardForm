@@ -34,7 +34,7 @@ export const TOPICS: readonly TopicMeta[] = [
   {
     id: "getting-started",
     nav: "Getting started",
-    summary: "What Chess Builder does, the three starter engines and where everything is.",
+    summary: "What BoardForm does, the starter engines and where everything is.",
     group: "start",
   },
   {

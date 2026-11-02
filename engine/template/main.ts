@@ -1,5 +1,5 @@
 // =====================================================================================
-// main.ts — the engine's interface to the host (Chess Builder Engine ABI v1)
+// main.ts — the engine's interface to the host (BoardForm Engine ABI v1)
 // =====================================================================================
 //
 // Every function exported from this file becomes a WebAssembly export that the host calls
@@ -29,7 +29,7 @@ import { MOVE_NONE } from "./types";
 import { nnueAlloc, nnueLoad, nnueReady } from "./nnue";
 
 /** Shown by cb_name. Change it to give your engine its own name. */
-const ENGINE_NAME: string = "Chess Builder Template 1.0";
+const ENGINE_NAME: string = "BoardForm Template 1.0";
 
 let pos = new Position();
 let spare = new Position();

@@ -152,7 +152,7 @@ export default function HelpPage({ params, query }: PageProps) {
   // The window title follows the topic.
   useEffect(() => {
     const previous = document.title;
-    document.title = topic ? `${topicTitle(topic)} · Help · Chess Builder` : "Help · Chess Builder";
+    document.title = topic ? `${topicTitle(topic)} · Help · BoardForm` : "Help · BoardForm";
     return () => {
       document.title = previous;
     };

@@ -145,7 +145,7 @@ describe("subscribe (other tabs / workers)", () => {
   it("delivers changes announced by another tab to local subscribers", async () => {
     const tab = otherTab();
     const local = record("engines");
-    const messageType = "chess-builder-db:changes";
+    const messageType = "boardform-db:changes";
     tab.channel.postMessage({ type: messageType, events: [{ store: "engines", id: "remote", op: "put" }] });
     // Malformed messages are ignored.
     tab.channel.postMessage("garbage");

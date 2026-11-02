@@ -1,6 +1,6 @@
-# Chess Builder Engine ABI — version 1
+# BoardForm Engine ABI — version 1
 
-Every engine in Chess Builder is a WebAssembly module that implements this ABI.
+Every engine in BoardForm is a WebAssembly module that implements this ABI.
 Engines built in the app are written in AssemblyScript and compiled in the browser,
 but any language that targets `wasm32` (C, C++, Rust, Zig, ...) can implement it and
 be uploaded as a `.wasm` file.

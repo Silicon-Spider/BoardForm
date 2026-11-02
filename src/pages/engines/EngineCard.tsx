@@ -105,7 +105,7 @@ function EngineCardImpl({ engine, networkName, networkMissing, now, highlighted,
           <div className="engines-card-badges">
             <KindBadge kind={engine.kind} small />
             {engine.builtin && (
-              <span className="badge badge-accent engines-badge-sm" title="One of the engines Chess Builder starts with">
+              <span className="badge badge-accent engines-badge-sm" title="One of the engines BoardForm starts with">
                 Starter
               </span>
             )}

@@ -107,7 +107,7 @@ class InProcessSelfPlayWorker implements SelfPlayWorkerLike {
       failInit
         ? {
             createEngine: async () => {
-              throw new Error("Not a Chess Builder engine: missing required export cb_go");
+              throw new Error("Not a BoardForm engine: missing required export cb_go");
             },
           }
         : {},
@@ -192,6 +192,6 @@ describe("self-play pool", () => {
     expect(results.sort()).toEqual(["0:w", "1:b", "2:w", "3:b"]);
 
     const broken = createWorkerSelfPlaySource(() => new InProcessSelfPlayWorker(true));
-    await expect(broken.selfPlay(job(3, 2), { onGame: () => {} }, new AbortController().signal)).rejects.toThrow(/could not be started for self-play: Not a Chess Builder engine/);
+    await expect(broken.selfPlay(job(3, 2), { onGame: () => {} }, new AbortController().signal)).rejects.toThrow(/could not be started for self-play: Not a BoardForm engine/);
   });
 });

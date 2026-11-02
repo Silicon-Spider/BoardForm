@@ -162,7 +162,7 @@ export default function App() {
       <nav className="app-nav">
         <Link to="/engines" className="app-brand">
           <img src="/pieces/chessnut/wN.svg" alt="" />
-          Chess Builder
+          BoardForm
         </Link>
         <div className="app-nav-links">
           {NAV.map((n) => (

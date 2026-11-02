@@ -143,7 +143,7 @@ async function makeTextDataset(page: Page, count: number, seed: number): Promise
     async ({ count, seed }) => {
       const n = (await import(String("/src/nnue/index.ts"))) as NnueModule;
       const data = n.makeMaterialDataset(count, seed);
-      const lines = ["# Chess Builder e2e dataset", ""];
+      const lines = ["# BoardForm e2e dataset", ""];
       for (let i = 0; i < count; i++) {
         const p = n.unpackPosition(data, i * 32);
         lines.push(`${n.packedToFen(data, i * 32)} | ${p.score} | ${p.result === 2 ? "1.0" : p.result === 0 ? "0.0" : "0.5"}`);
@@ -667,7 +667,7 @@ test.describe("NNUE Lab", () => {
     // A broken network file is refused with a clear message.
     await chooseFile(page, page.getByRole("button", { name: "Import .nnue" }).first(), { name: "junk.nnue", mimeType: "application/octet-stream", buffer: Buffer.from("not a network") });
     await expect(toast(page, "Could not import the network")).toBeVisible();
-    await expect(toast(page, "Could not import the network")).toContainText("not a network file Chess Builder can use");
+    await expect(toast(page, "Could not import the network")).toContainText("not a network file BoardForm can use");
 
     // Import a real one (HL16), then export it again: same bytes.
     const netFile = await makeNetworkFile(page, 16, 11);

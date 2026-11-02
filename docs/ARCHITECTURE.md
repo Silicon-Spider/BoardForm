@@ -1,8 +1,13 @@
-# Chess Builder — architecture & module contracts
+# BoardForm — architecture & module contracts
 
-Chess Builder is a browser app (React 19 + TypeScript + Vite) in which users create their own
+BoardForm is a browser app (React 19 + TypeScript + Vite) in which users create their own
 WebAssembly chess engines, train NNUE networks, and play against / pit engines against each other.
 Everything runs client-side; all user data is stored in IndexedDB, so it survives closing the tab.
+
+The app was first called *Chess Builder*. Identifiers that hold saved data or define file formats keep
+that origin on purpose: the IndexedDB database `chess-builder`, `cb.*` localStorage keys, the `cb_*`
+exports of the engine ABI and the `CBNN` / `CBDS` file magics. Backup and engine files are written as
+`boardform-backup` / `boardform-engine`; the old `chess-builder-*` format names are still accepted.
 
 Companion specs (normative): [`ENGINE_ABI.md`](ENGINE_ABI.md), [`ENGINE_TEMPLATE.md`](ENGINE_TEMPLATE.md),
 [`NNUE_FORMAT.md`](NNUE_FORMAT.md). Shared types: `src/types/*.ts`.
@@ -60,7 +65,7 @@ Main thread (React UI + services)
  ├─ arena service   ──► EngineClients (2 per running game)
  ├─ training service──► selfplay.worker ×K (EngineInstance in-worker, plays games, packs positions → IndexedDB)
  │                  └─► trainer.worker    (reads dataset chunks from IndexedDB, trains, posts progress/checkpoints)
- └─ storage (IndexedDB; BroadcastChannel "chess-builder-db" notifies other tabs)
+ └─ storage (IndexedDB; BroadcastChannel "boardform-db" notifies other tabs)
 ```
 
 * The page is cross-origin isolated (COOP/COEP headers in `vite.config.ts`), so `SharedArrayBuffer`
@@ -72,7 +77,7 @@ Main thread (React UI + services)
   `autoResume` restart when the app is opened again. Web Locks (`navigator.locks`) ensure only one tab
   executes a given run.
 
-## 4. Data model (IndexedDB database `chess-builder`, version 1)
+## 4. Data model (IndexedDB database `chess-builder`, version 1 — the app's original name)
 
 | Store | Key | Value type (`src/types`) | Indexes |
 |---|---|---|---|
@@ -119,7 +124,12 @@ exportBackup(opts?: { includeDatasets?: boolean; includeGames?: boolean }): Prom
 importBackup(file: Blob): Promise<Record<StoreName, number>>;
 exportEngineFile(id): Promise<Blob>;   importEngineFile(file: Blob): Promise<string /* new id */>;
 requestPersistentStorage(): Promise<boolean>;  storageEstimate(): Promise<{ usage: number; quota: number; persisted: boolean }>;
-ensureSeeded(): Promise<void>;         // first-run starter engines (idempotent, uses settings key "seeded.v1")
+ensureSeeded(): Promise<void>;         // first-run starters (idempotent; settings keys "seeded.v1" and "seeded.network.v1")
+// "seeded.v1": Blocky (blocks), Classic (eval), Sprout (scratch). "seeded.network.v1": the starter
+// network (id STARTER_NETWORK_ID, builtin, fetched from public/networks/starter-hl128.nnue: HL 128,
+// SCReLU, trained on 5M self-play positions of the stock HCE) and the NNUE engine "Neuron"
+// (id STARTER_NNUE_ENGINE_ID) that uses it. Fixed ids: seeding again only re-adds missing records.
+// If the download fails, the network flag stays unset and the next start retries.
 ```
 
 `@/storage` must be importable from workers (no React in `db.ts`/`repos.ts`; hooks live in `hooks.ts`
@@ -368,13 +378,13 @@ Routes (hash router in `src/app/router.ts`):
 
 | Route | Page |
 |---|---|
-| `#/` and `#/engines` | Engine library. `?new=1` opens the new-engine wizard (`&kind=<EngineKind>`, `&networkId=<id>` preselect) |
+| `#/` and `#/engines` | Engine library. `?q=<text>` search; `?new=1` opens the new-engine wizard (`&kind=<EngineKind>`, `&networkId=<id>` preselect) |
 | `#/engines/:id` | Workshop. Optional `?tab=<id>` and `?file=<path>` |
 | `#/play` | Play. `?engine=<id>` (you vs that engine, you play White), `?white=<engineId or human>&black=<engineId or human>`, `?fen=<FEN>`, `?analysis=<engineId>`, `?game=<gameId>` (open a saved game) |
-| `#/arena`, `#/arena/:id` | Matches. `#/arena?new=1&engines=<id>,<id>` opens the new-match form prefilled |
-| `#/lab` | NNUE Lab overview. Sections: `#/lab/runs`, `#/lab/runs/:id`, `#/lab/networks`, `#/lab/networks/:id`, `#/lab/datasets`, `#/lab/datasets/:id`, `#/lab/new` (run wizard; `?networkId=<id>&mode=continue` or `mode=widen`) |
-| `#/settings` | Settings & data |
-| `#/help`, `#/help/:topic` | Documentation (topics: `getting-started`, `blocks`, `eval-api`, `full-engine`, `scratch`, `abi`, `nnue`, `play-and-arena`, `limits`, `storage`) |
+| `#/arena`, `#/arena/:id` | Matches. `#/arena?new=1&engines=<id>,<id>` opens the new-match form prefilled; `&from=<matchId>` prefills a rematch |
+| `#/lab` | NNUE Lab overview. Sections: `#/lab/runs`, `#/lab/runs/:id`, `#/lab/networks`, `#/lab/networks/:id`, `#/lab/datasets`, `#/lab/datasets/:id`, `#/lab/new` (run wizard; `?networkId=<id>&mode=continue` or `mode=widen`; `?datasetIds=<id>,<id>` preselects datasets) |
+| `#/settings` | Settings & data. `?section=appearance\|engines\|storage\|danger\|about` scrolls to a section |
+| `#/help`, `#/help/:topic` | Documentation (topics: `getting-started`, `blocks`, `eval-api`, `full-engine`, `scratch`, `abi`, `nnue`, `play-and-arena`, `limits`, `storage`). `?section=<heading slug>` opens a section |
 
 Every page is a default-exported component in `src/pages/<name>/index.tsx` and gets the full content
 area (the layout supplies the nav bar). Use the design system classes in `src/styles/global.css`

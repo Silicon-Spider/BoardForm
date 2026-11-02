@@ -30,7 +30,7 @@ const hold = (id: string) => {
   // Simulates another tab running the match: hold its lock until release() is called.
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
-    void navigator.locks.request(`chess-builder:match:${id}`, () => {
+    void navigator.locks.request(`boardform:match:${id}`, () => {
       resolve();
       return new Promise<void>((r) => (release = r));
     });

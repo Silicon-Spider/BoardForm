@@ -1,5 +1,5 @@
 // Minimal structural types for the parts of the AssemblyScript compiler API ("assemblyscript/asc")
-// that Chess Builder uses.
+// that BoardForm uses.
 //
 // We deliberately never let TypeScript see asc's own declaration files: they declare
 // AssemblyScript's globals (`i32`, `abs`, `Array.prototype.at(): T`, ...) at the top level, which would

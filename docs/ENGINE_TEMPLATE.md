@@ -1,6 +1,6 @@
 # The AssemblyScript engine template (`engine/`)
 
-Every engine built inside Chess Builder (except uploaded `.wasm` files) is compiled from
+Every engine built inside BoardForm (except uploaded `.wasm` files) is compiled from
 AssemblyScript sources. The canonical sources live in `engine/template/` and are bundled into
 the web app as raw strings. Users can edit just `eval.ts`, generate it from blocks, or edit every
 file. `engine/variants/` holds alternative starting points.

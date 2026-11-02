@@ -69,7 +69,7 @@ export function createNetworkService(deps: ServiceDeps, hooks: NetworkServiceHoo
       try {
         q = parseNetworkFile(bytes);
       } catch (e) {
-        throw new Error(`This is not a network file Chess Builder can use: ${e instanceof Error ? e.message : String(e)}`);
+        throw new Error(`This is not a network file BoardForm can use: ${e instanceof Error ? e.message : String(e)}`);
       }
       const id = deps.newId();
       const now = Date.now();

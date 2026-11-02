@@ -1,6 +1,6 @@
 // @ts-nocheck — AssemblyScript source (test fixture). The app's TypeScript program must not check it.
 //
-// tiny-engine: a deliberately silly engine implementing the Chess Builder ABI (docs/ENGINE_ABI.md)
+// tiny-engine: a deliberately silly engine implementing the BoardForm ABI (docs/ENGINE_ABI.md)
 // with canned answers, so the host (src/engine-host) can be tested end to end.
 //
 // Positions

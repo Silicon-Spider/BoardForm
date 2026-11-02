@@ -43,7 +43,7 @@ export function HelpHome() {
     <div className="help-home">
       <header className="help-hero">
         <p className="help-eyebrow">Help &amp; documentation</p>
-        <h1>Learn Chess Builder</h1>
+        <h1>Learn BoardForm</h1>
         <p className="help-lead">
           Build chess engines with blocks or code, train neural networks with self-play, and find out which ideas really make
           an engine stronger. Start with the basics, or jump straight to a topic.

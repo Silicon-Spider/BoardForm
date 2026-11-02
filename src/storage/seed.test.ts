@@ -1,4 +1,6 @@
 import "fake-indexeddb/auto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -25,8 +27,8 @@ vi.mock("./persist", () => ({
 }));
 
 import { listQuery } from "./cache";
-import { clearAllData, enginesRepo, settingsRepo } from "./repos";
-import { SEED_FLAG_KEY, ensureSeeded } from "./seed";
+import { clearAllData, enginesRepo, networksRepo, settingsRepo } from "./repos";
+import { NETWORK_SEED_FLAG_KEY, SEED_FLAG_KEY, STARTER_NETWORK_ID, STARTER_NNUE_ENGINE_ID, ensureSeeded } from "./seed";
 import { resetStorage, waitFor } from "./test-utils";
 
 beforeEach(async () => {
@@ -164,5 +166,106 @@ describe("ensureSeeded", () => {
     expect(await settingsRepo.get(SEED_FLAG_KEY, false)).toBe(false);
     await ensureSeeded(); // and a later call can still succeed
     expect(await enginesRepo.list()).toHaveLength(3);
+  });
+});
+
+describe("ensureSeeded: the starter network", () => {
+  // The real file the app serves from public/; fetched through a stubbed fetch() and location.
+  const netBytes = (): ArrayBuffer => {
+    const buf = readFileSync(resolve(__dirname, "../../public/networks/starter-hl128.nnue"));
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+  };
+  const serve = (ok = true) => {
+    const fetchMock = vi.fn(async (url: URL | string) => {
+      expect(String(url)).toBe("http://app.test/networks/starter-hl128.nnue");
+      if (!ok) throw new TypeError("Failed to fetch");
+      return new Response(netBytes(), { status: 200 });
+    });
+    vi.stubGlobal("location", { href: "http://app.test/#/engines" });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  };
+
+  it("adds the starter network and the engine Neuron that plays it", async () => {
+    serve();
+    await ensureSeeded();
+    const engines = await enginesRepo.list();
+    expect(engines.map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    const neuron = (await enginesRepo.get(STARTER_NNUE_ENGINE_ID))!;
+    expect(neuron).toMatchObject({ kind: "nnue", builtin: true, networkId: STARTER_NETWORK_ID, templateVersion: 7, tags: ["starter", "nnue"] });
+    expect(mocks.defaultFilesFor).toHaveBeenCalledWith("nnue");
+
+    const net = (await networksRepo.get(STARTER_NETWORK_ID))!;
+    expect(net).toMatchObject({ hidden: 128, activation: 1, builtin: true, sizeBytes: 197_444, parentId: null });
+    expect(net.name).toBe("Starter network (128 SCReLU)");
+    const data = (await networksRepo.getData(STARTER_NETWORK_ID))!;
+    expect(new Uint8Array(data.quantized)).toEqual(new Uint8Array(netBytes()));
+    expect(data.float?.w1).toBeInstanceOf(Float32Array); // can be trained further
+    expect(data.float?.w1.length).toBe(768 * 128);
+
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(true);
+    expect(mocks.requestPersistentStorage).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds only the network part to a database seeded before it existed", async () => {
+    await ensureSeeded(); // no location: the network part is skipped, as in an old version
+    expect(await enginesRepo.list()).toHaveLength(3);
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(false);
+
+    const fetchMock = serve();
+    await ensureSeeded();
+    expect((await enginesRepo.list()).map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect(mocks.generateEvalSource).toHaveBeenCalledTimes(1); // the engines were not rebuilt
+    await ensureSeeded();
+    expect(fetchMock).toHaveBeenCalledTimes(1); // flag set: no more downloads
+    expect(mocks.requestPersistentStorage).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries on a later start when the download fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    serve(false);
+    await ensureSeeded();
+    expect(await enginesRepo.list()).toHaveLength(3);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Could not download the starter network"), expect.anything());
+    expect(await settingsRepo.get(NETWORK_SEED_FLAG_KEY, false)).toBe(false);
+
+    serve();
+    await ensureSeeded();
+    expect(await enginesRepo.get(STARTER_NNUE_ENGINE_ID)).toBeDefined();
+  });
+
+  it("never overwrites or duplicates the network or Neuron when seeding again", async () => {
+    serve();
+    await ensureSeeded();
+    await enginesRepo.update(STARTER_NNUE_ENGINE_ID, { name: "My Neuron" });
+    await networksRepo.update(STARTER_NETWORK_ID, { name: "Renamed" });
+    await settingsRepo.remove(NETWORK_SEED_FLAG_KEY); // what "Restore starter engines" does
+    await ensureSeeded();
+    expect((await enginesRepo.get(STARTER_NNUE_ENGINE_ID))?.name).toBe("My Neuron");
+    expect((await networksRepo.get(STARTER_NETWORK_ID))?.name).toBe("Renamed");
+    expect(await enginesRepo.list()).toHaveLength(4);
+
+    // Deleted ones come back once the flag is cleared.
+    await enginesRepo.remove(STARTER_NNUE_ENGINE_ID);
+    await networksRepo.remove(STARTER_NETWORK_ID);
+    await ensureSeeded();
+    expect(await enginesRepo.get(STARTER_NNUE_ENGINE_ID)).toBeUndefined(); // flag still set
+    await settingsRepo.remove(NETWORK_SEED_FLAG_KEY);
+    await ensureSeeded();
+    expect((await enginesRepo.get(STARTER_NNUE_ENGINE_ID))?.name).toBe("Neuron");
+    expect((await networksRepo.get(STARTER_NETWORK_ID))?.builtin).toBe(true);
+  });
+
+  it("seeds the network once when two tabs start together", async () => {
+    const fetchMock = serve();
+    vi.resetModules();
+    const tabA = await import("./seed");
+    vi.resetModules();
+    const tabB = await import("./seed");
+    await Promise.all([tabA.ensureSeeded(), tabB.ensureSeeded()]);
+    vi.resetModules();
+    const { enginesRepo: freshRepo } = await import("./repos");
+    expect((await freshRepo.list()).map((e) => e.name)).toEqual(["Blocky", "Classic", "Sprout", "Neuron"]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

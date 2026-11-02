@@ -3,7 +3,7 @@
 // =====================================================================================
 //
 // NNUE ("efficiently updatable neural network") is the kind of evaluation the strongest
-// engines use today. Chess Builder trains small NNUE networks in its Lab; this file loads
+// engines use today. BoardForm trains small NNUE networks in its Lab; this file loads
 // such a network (a CBNN file, see docs/NNUE_FORMAT.md) and computes its evaluation. It
 // follows the integer arithmetic of the format exactly, so the engine's score is always
 // identical to the one the app computes in JavaScript.
@@ -365,7 +365,7 @@ function outputCReLU(us: usize, them: usize): i64 {
 
 /**
  * SCReLU: Σ cr(us[j])²·W2[j] + Σ cr(them[j])²·W2[HL + j], for networks whose output weights
- * all lie in [-128, 128] (always true for networks trained in Chess Builder, where |W2| ≤
+ * all lie in [-128, 128] (always true for networks trained in BoardForm, where |W2| ≤
  * 127). Then a·w fits in 16 bits (255·128 = 32640), so `i16x8.mul` computes it exactly and a
  * dot product with `a` gives (a·w)·a = a²·w.
  */

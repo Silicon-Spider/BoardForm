@@ -13,7 +13,7 @@ All limits can be combined, and the engine stops at **whichever limit it reaches
 | Time per move | **Time per move** (seconds) | Spend at most this long on this move. |
 | Clock | **Time control** (**Clock** in compact editors) | A game clock: base time, increment, moves per control. The engine manages its own time. |
 
-Turn a limit on with its checkbox (in the compact version of the editor, type a value; an empty field means no limit). If you set no clock and no limit at all, the editor warns you — an engine without any limit would think forever — and in a game Chess Builder then gives the engine one second per move.
+Turn a limit on with its checkbox (in the compact version of the editor, type a value; an empty field means no limit). If you set no clock and no limit at all, the editor warns you — an engine without any limit would think forever — and in a game BoardForm then gives the engine one second per move.
 
 ## Depth
 

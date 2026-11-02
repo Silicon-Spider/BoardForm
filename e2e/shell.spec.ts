@@ -4,7 +4,7 @@ test("app shell loads, is cross-origin isolated, and navigates", async ({ page }
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.locator(".app-brand")).toContainText("Chess Builder");
+  await expect(page.locator(".app-brand")).toContainText("BoardForm");
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
   for (const [label, hash] of [
     ["Play", "#/play"],

@@ -118,7 +118,7 @@ function PersistenceRow({ estimate, onChanged }: { estimate: StorageEstimateInfo
   return (
     <SettingRow
       title="Keep my data"
-      description="When a device runs low on disk space, browsers may delete data of sites that are not marked persistent. Persistent storage asks the browser to keep Chess Builder's data until you delete it."
+      description="When a device runs low on disk space, browsers may delete data of sites that are not marked persistent. Persistent storage asks the browser to keep BoardForm's data until you delete it."
     >
       <span className={cx("badge settings-status", persisted ? "badge-ok" : "badge-warn")}>
         <span className="settings-status-dot" aria-hidden="true" />
@@ -326,7 +326,7 @@ function RestoreStartersRow() {
     }
   };
   return (
-    <SettingRow title="Restore starter engines" description="Brings back Blocky, Classic and Sprout if you deleted or changed them, as fresh copies. Your own engines — and the starter engines you changed — are kept as they are.">
+    <SettingRow title="Restore starter engines" description="Brings back Blocky, Classic, Sprout and Neuron if you deleted or changed them, as fresh copies. Your own engines — and the starter engines you changed — are kept as they are.">
       <button type="button" className="btn btn-sm" onClick={run} disabled={busy}>
         {busy ? <span className="spinner" style={{ width: 13, height: 13 }} aria-hidden="true" /> : <PageIcon name="refresh" size={14} />}
         {busy ? "Restoring…" : "Restore starter engines"}

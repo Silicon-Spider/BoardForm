@@ -91,8 +91,8 @@ let dark: Blockly.Theme | null = null;
 let light: Blockly.Theme | null = null;
 
 export function darkTheme(): Blockly.Theme {
-  dark ??= Blockly.Theme.defineTheme("chess-builder-dark", {
-    name: "chess-builder-dark",
+  dark ??= Blockly.Theme.defineTheme("boardform-dark", {
+    name: "boardform-dark",
     base: Blockly.Themes.Classic,
     blockStyles: BLOCK_STYLES,
     categoryStyles: CATEGORY_STYLES,
@@ -119,8 +119,8 @@ export function darkTheme(): Blockly.Theme {
 }
 
 export function lightTheme(): Blockly.Theme {
-  light ??= Blockly.Theme.defineTheme("chess-builder-light", {
-    name: "chess-builder-light",
+  light ??= Blockly.Theme.defineTheme("boardform-light", {
+    name: "boardform-light",
     base: Blockly.Themes.Classic,
     blockStyles: BLOCK_STYLES,
     categoryStyles: CATEGORY_STYLES,

@@ -1,6 +1,6 @@
 # Evaluation code
 
-An **Eval code** engine is the stock Chess Builder search with an evaluation function you write yourself, in a single file: `eval.ts`. The search — iterative deepening, alpha-beta, the transposition table, time management — comes from the current template, so you can concentrate on one question: *how good is this position?*
+An **Eval code** engine is the stock BoardForm search with an evaluation function you write yourself, in a single file: `eval.ts`. The search — iterative deepening, alpha-beta, the transposition table, time management — comes from the current template, so you can concentrate on one question: *how good is this position?*
 
 The starter engine **Classic** is an Eval code engine, and a new Eval code engine starts with the same `eval.ts`: a tapered hand-crafted evaluation with PeSTO's material values and piece-square tables, mobility, pawn structure, the bishop pair, rooks on open files, king safety and a bonus for the side to move. Read it, change a weight, or replace it completely.
 

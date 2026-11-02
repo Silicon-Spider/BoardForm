@@ -28,7 +28,7 @@ Choose an engine for both colours and watch them play each other, each with its 
 
 In **Analysis** mode, choose an engine to analyse with. It searches the position on the board continuously and shows its score and best line while you play moves or step through a game with <kbd>←</kbd> / <kbd>→</kbd>; whenever the position changes, it starts again on the new one. Scores can be shown from White's point of view or from the side to move's. The **Position** tools set up a position piece by piece (**Set up…**), paste one (**Load FEN…**), load a game (**Import PGN…**), or turn the position on the board into a game against an engine (**Play from here**).
 
-Analysis uses an *infinite* search that runs until it is stopped. Chess Builder normally stops a search instantly through shared memory; when the browser doesn't allow that, it restarts the engine instead, which works just as well but takes a moment (**Instant engine stop** in [Settings](#/settings?section=engines) shows which one you have).
+Analysis uses an *infinite* search that runs until it is stopped. BoardForm normally stops a search instantly through shared memory; when the browser doesn't allow that, it restarts the engine instead, which works just as well but takes a moment (**Instant engine stop** in [Settings](#/settings?section=engines) shows which one you have).
 
 ## Clocks and limits
 

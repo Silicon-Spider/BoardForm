@@ -1,4 +1,4 @@
-// Chess Builder Engine ABI v1 constants and checks (docs/ENGINE_ABI.md).
+// BoardForm Engine ABI v1 constants and checks (docs/ENGINE_ABI.md).
 import type { SearchLimits } from "@/types";
 import { formatFuncType, type WasmFuncType, type WasmModuleInfo, type WasmValType } from "./module-info";
 

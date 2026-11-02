@@ -1,4 +1,4 @@
-// A minimal Node host for Chess Builder engines (docs/ENGINE_ABI.md), used by the engine tests.
+// A minimal Node host for BoardForm engines (docs/ENGINE_ABI.md), used by the engine tests.
 //
 // It supplies the `env` imports (abort, cb_now, cb_should_stop, cb_info, cb_log, seed, trace,
 // plus a harmless stub for any other function import), and wraps the cb_* exports in

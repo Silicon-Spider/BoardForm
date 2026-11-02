@@ -113,7 +113,7 @@ export class EngineInstance {
 
     const missing = REQUIRED_FUNCTIONS.filter((name) => !WebAssembly.Module.exports(wasmModule).some((e) => e.name === name && e.kind === "function"));
     if (missing.length) {
-      throw new Error(`Not a Chess Builder engine: missing required export${missing.length > 1 ? "s" : ""} ${missing.join(", ")} (see the Engine ABI documentation).`);
+      throw new Error(`Not a BoardForm engine: missing required export${missing.length > 1 ? "s" : ""} ${missing.join(", ")} (see the Engine ABI documentation).`);
     }
     if (info) {
       const { errors } = checkExportSignatures(info);
@@ -142,7 +142,7 @@ export class EngineInstance {
     }
 
     const memory = instance.exports.memory instanceof WebAssembly.Memory ? instance.exports.memory : built.importedMemory;
-    if (!memory) throw new Error("Not a Chess Builder engine: it does not export its memory as `memory`.");
+    if (!memory) throw new Error("Not a BoardForm engine: it does not export its memory as `memory`.");
     mem.attach(memory);
 
     const engine = new EngineInstance(instance.exports, mem, built, opts);

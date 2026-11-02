@@ -134,7 +134,7 @@ describe("list caches", () => {
     await (await getDB()).put("engines", makeEngine("remote", { name: "From tab 2" }));
     const tab2 = new BroadcastChannel(CHANNEL_NAME);
     offs.push(() => tab2.close());
-    tab2.postMessage({ type: "chess-builder-db:changes", events: [{ store: "engines", id: "remote", op: "put" }] });
+    tab2.postMessage({ type: "boardform-db:changes", events: [{ store: "engines", id: "remote", op: "put" }] });
     await waitFor(() => names(data(q.getSnapshot())).includes("From tab 2"), 2000, "remote change");
   });
 

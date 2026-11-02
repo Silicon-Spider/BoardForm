@@ -2,7 +2,7 @@
 //
 // Every repo write calls `emitChanges()` after its transaction has committed. Listeners registered
 // with `subscribe()` in this JS context are called synchronously, and the same batch is posted on the
-// BroadcastChannel "chess-builder-db" so other tabs and workers of this origin (each with their own
+// BroadcastChannel "boardform-db" so other tabs and workers of this origin (each with their own
 // copy of this module) deliver it to their listeners too. BroadcastChannel never echoes a message
 // back to the channel object that sent it, so local listeners are not called twice.
 
@@ -25,12 +25,12 @@ export interface ChangeEvent {
 export type ChangeListener = (event: ChangeEvent) => void;
 
 export const ALL_RECORDS = "*";
-export const CHANNEL_NAME = "chess-builder-db";
+export const CHANNEL_NAME = "boardform-db";
 
 /** More events than this for one store in one batch are collapsed into a single ALL_RECORDS event. */
 export const COLLAPSE_THRESHOLD = 64;
 
-const MESSAGE_TYPE = "chess-builder-db:changes";
+const MESSAGE_TYPE = "boardform-db:changes";
 
 interface ChangesMessage {
   type: typeof MESSAGE_TYPE;

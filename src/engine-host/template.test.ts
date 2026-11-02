@@ -146,7 +146,7 @@ describe.skipIf(!ready)("engine template through EngineInstance", () => {
     expect(compileMs).toBeGreaterThan(0);
     const { engine, logs } = await start({ hashMb: 32 });
     expect(engine.capabilities).toEqual({
-      abiVersion: 1, eval: true, trace: true, perft: true, nnue: true, setOption: true, name: "Chess Builder Template 1.0", stopFlag: true,
+      abiVersion: 1, eval: true, trace: true, perft: true, nnue: true, setOption: true, name: "BoardForm Template 1.0", stopFlag: true,
     });
     expect(engine.stubbedImports).toEqual([]); // the template only imports what the host provides
     expect(logs.filter((l) => l.startsWith("[host]"))).toEqual([]); // e.g. Hash=32 was accepted

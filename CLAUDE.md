@@ -1,4 +1,4 @@
-# Chess Builder
+# BoardForm
 
 Browser app (React 19 + TypeScript + Vite) where users build their own WebAssembly chess engines
 (drag-and-drop blocks, eval-only code, full engine code, or from scratch — AssemblyScript compiled

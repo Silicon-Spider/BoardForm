@@ -2,7 +2,7 @@
 //  Your engine — start here                                    (Engine ABI v1)
 // =============================================================================
 //
-//  This is an empty chess engine. It already talks to Chess Builder correctly:
+//  This is an empty chess engine. It already talks to BoardForm correctly:
 //  every function the app calls exists and the text plumbing is done. What it
 //  can't do yet is play chess: cb_go() answers "no move". Everything else is up
 //  to you. This file explains the contract and suggests an order to build in.
@@ -185,7 +185,7 @@ function stopNow(deadline: f64): bool {
 let positionCommand: string = "startpos";
 
 // -----------------------------------------------------------------------------
-// 4. The functions Chess Builder calls (required by Engine ABI v1)
+// 4. The functions BoardForm calls (required by Engine ABI v1)
 // -----------------------------------------------------------------------------
 
 /** Tells the app which version of the ABI this engine implements. Keep it 1. */

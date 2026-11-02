@@ -215,7 +215,7 @@ export function pgnHeaders(args: {
   const { players, createdAt, opening, end } = args;
   const headers: Record<string, string> = {
     Event: "Casual game",
-    Site: "Chess Builder",
+    Site: "BoardForm",
     Date: pgnDate(createdAt),
     Round: "-",
     White: players.w.name,

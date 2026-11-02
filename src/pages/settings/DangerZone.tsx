@@ -84,7 +84,7 @@ function DeleteAllDialog({ onClose, onDeleted }: { onClose: () => void; onDelete
     }
     toast("All data deleted", {
       kind: "success",
-      detail: reseeded ? "The starter engines Blocky, Classic and Sprout are back." : "The starter engines could not be re-created — use Restore starter engines.",
+      detail: reseeded ? "The starter engines Blocky, Classic, Sprout and Neuron are back." : "The starter engines could not be re-created — use Restore starter engines.",
     });
     onDeleted();
   };
@@ -112,7 +112,7 @@ function DeleteAllDialog({ onClose, onDeleted }: { onClose: () => void; onDelete
     >
       <div className="stack settings-delete">
         <p className="settings-delete-text">
-          This permanently deletes <strong>everything</strong> Chess Builder stored in this browser: engines, networks, datasets, saved
+          This permanently deletes <strong>everything</strong> BoardForm stored in this browser: engines, networks, datasets, saved
           games, matches, training runs and settings. Running training, dataset generation and matches are stopped first. This cannot be
           undone.
         </p>

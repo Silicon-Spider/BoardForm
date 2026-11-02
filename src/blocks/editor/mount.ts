@@ -42,7 +42,7 @@ export interface EditorController {
 }
 
 const DEBOUNCE_MS = 300;
-const WARNING_ID = "chess-builder";
+const WARNING_ID = "boardform";
 
 export function mountBlocksEditor(container: HTMLElement, opts: MountOptions): EditorController {
   registerBlocks();

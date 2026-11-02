@@ -190,7 +190,7 @@ describe("exportBackup / importBackup", () => {
 
   it("rejects bad files with a descriptive error and writes nothing", async () => {
     expect((await errorOf(importBackup(new Blob(["{ not json"])))).message).toMatch(/not readable JSON/);
-    expect((await errorOf(importBackup(jsonBlob({ hello: 1 })))).message).toMatch(/not a Chess Builder backup/);
+    expect((await errorOf(importBackup(jsonBlob({ hello: 1 })))).message).toMatch(/not a BoardForm backup/);
     expect((await errorOf(importBackup(jsonBlob({ format: ENGINE_FILE_FORMAT, version: 1 })))).message).toMatch(/single-engine file/);
     expect((await errorOf(importBackup(jsonBlob({ format: BACKUP_FORMAT, version: 99, stores: {} })))).message).toMatch(/newer version/);
 
@@ -266,6 +266,24 @@ describe("exportEngineFile / importEngineFile", () => {
     expect((await errorOf(importEngineFile(jsonBlob({ format: ENGINE_FILE_FORMAT, version: 1, engine: { name: "x", kind: "wasm" } })))).message).toMatch(
       /WebAssembly module is missing/,
     );
+  });
+
+  it("still accepts files written under the app's former name (Chess Builder)", async () => {
+    await enginesRepo.put(makeEngine("old", { name: "Old engine" }));
+    const legacy = (value: Record<string, unknown>, format: string) => jsonBlob({ ...value, format });
+
+    const engineFile = JSON.parse(await (await exportEngineFile("old")).text()) as Record<string, unknown>;
+    expect(engineFile.format).toBe("boardform-engine");
+    const imported = await importEngineFile(legacy(engineFile, "chess-builder-engine"));
+    expect((await enginesRepo.get(imported))?.name).toBe("Old engine (imported)");
+
+    const backup = JSON.parse(await (await exportBackup()).text()) as Record<string, unknown>;
+    expect(backup.format).toBe("boardform-backup");
+    await enginesRepo.remove("old");
+    expect((await importBackup(legacy(backup, "chess-builder-backup"))).engines).toBe(2);
+    expect((await enginesRepo.get("old"))?.name).toBe("Old engine");
+    // The legacy names are still told apart from each other.
+    expect((await errorOf(importBackup(legacy(engineFile, "chess-builder-engine")))).message).toMatch(/single-engine file/);
   });
 
   it("names collisions case-insensitively", () => {

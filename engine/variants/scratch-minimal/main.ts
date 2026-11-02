@@ -10,7 +10,7 @@
 //     4  FEN and the position command       9  evaluation: material + piece-square tables
 //     5  attack detection                  10  search: iterative deepening, alpha-beta,
 //     6  move generation (castling, en         quiescence, move ordering, time control
-//        passant, promotion)               11  the cb_* functions Chess Builder calls
+//        passant, promotion)               11  the cb_* functions BoardForm calls
 //
 //  How the app talks to an engine: Help → Engine ABI (docs/ENGINE_ABI.md).
 //
@@ -1068,7 +1068,7 @@ function timeForMove(timeLeft: i32, increment: i32, movesToGo: i32): f64 {
 }
 
 // -----------------------------------------------------------------------------
-// 11. The functions Chess Builder calls (Engine ABI v1)
+// 11. The functions BoardForm calls (Engine ABI v1)
 // -----------------------------------------------------------------------------
 
 export function cb_abi_version(): i32 { return 1; }

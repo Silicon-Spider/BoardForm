@@ -149,7 +149,7 @@ function decodeTagged(tag: string, obj: Record<string, unknown>): unknown {
   if (tag === "ArrayBuffer") return buffer;
   if (tag === "DataView") return new DataView(buffer);
   const Ctor = TYPED_ARRAYS.get(tag);
-  if (!Ctor) throw invalid(`Unsupported value type "${tag}" — was this file made by a newer version of Chess Builder?`);
+  if (!Ctor) throw invalid(`Unsupported value type "${tag}" — was this file made by a newer version of BoardForm?`);
   if (buffer.byteLength % Ctor.BYTES_PER_ELEMENT !== 0) throw invalid(`Corrupt file: "${tag}" data has a wrong length.`);
   return new Ctor(buffer);
 }

@@ -31,8 +31,8 @@ function starter(id: string, name: string, createdAt: number, overrides: Partial
 
 describe("settings helpers", () => {
   it("names backups by local date", () => {
-    expect(backupFileName(new Date(2026, 10, 2, 23, 59))).toBe("chess-builder-backup-2026-11-02.json");
-    expect(backupFileName(new Date(2027, 0, 9))).toBe("chess-builder-backup-2027-01-09.json");
+    expect(backupFileName(new Date(2026, 10, 2, 23, 59))).toBe("boardform-backup-2026-11-02.json");
+    expect(backupFileName(new Date(2027, 0, 9))).toBe("boardform-backup-2027-01-09.json");
   });
 
   it("maps animation durations to the nearest preset", () => {

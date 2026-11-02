@@ -81,7 +81,7 @@ export default function SettingsPage({ query }: PageProps) {
   // The window title names the page, as the Workshop and Help do.
   useEffect(() => {
     const previous = document.title;
-    document.title = "Settings · Chess Builder";
+    document.title = "Settings · BoardForm";
     return () => {
       document.title = previous;
     };

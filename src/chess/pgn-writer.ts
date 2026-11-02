@@ -38,7 +38,7 @@ export function buildPgn(opts: {
   const { startFen, san, result } = opts;
   const tags: Record<string, string> = {
     Event: "?",
-    Site: "Chess Builder",
+    Site: "BoardForm",
     Date: today(),
     Round: "?",
     White: "?",
